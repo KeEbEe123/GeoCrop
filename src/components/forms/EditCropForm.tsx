@@ -5,10 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ImageUpload from '@/components/ui/image-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Crop } from '@/types';
-import { ImagePlus, X } from 'lucide-react';
 
 interface EditCropFormProps {
   crop: Crop;
@@ -27,9 +27,10 @@ const EditCropForm: React.FC<EditCropFormProps> = ({ crop, onCropUpdated, onCanc
     category: crop.category || '',
     harvestDate: crop.harvestDate || ''
   });
-  const [imageUrls, setImageUrls] = useState<string[]>(crop.images.length > 0 ? crop.images : ['']);
+  const [imageUrls, setImageUrls] = useState<string[]>(crop.images.length > 0 ? crop.images : []);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user) return;
@@ -44,53 +45,50 @@ const EditCropForm: React.FC<EditCropFormProps> = ({ crop, onCropUpdated, onCanc
       return;
     }
 
-    // Filter out empty image URLs
-    const validImages = imageUrls.filter(url => url.trim() !== '');
-    if (validImages.length === 0) {
+    // Check if images are uploaded
+    if (imageUrls.length === 0) {
       toast({
         title: "Images Required",
-        description: "Please add at least one image of your crop.",
+        description: "Please upload at least one image of your crop.",
         variant: "destructive"
       });
       return;
     }
 
-    const updatedCropData: Partial<Crop> = {
-      name: formData.name,
-      quantity: parseInt(formData.quantity),
-      price: parseFloat(formData.price),
-      description: formData.description,
-      category: formData.category,
-      harvestDate: formData.harvestDate,
-      images: validImages,
-      isOrganic: crop.isOrganic, // Keep existing organic status
-      certifications: crop.certifications, // Keep existing certifications
-      storageType: crop.storageType, // Keep existing storage type
-      shelfLife: crop.shelfLife, // Keep existing shelf life
-      minOrderQuantity: crop.minOrderQuantity, // Keep existing min order
-      availableFrom: crop.availableFrom, // Keep existing availability
-      availableTo: crop.availableTo, // Keep existing availability
-      cropVariety: crop.cropVariety, // Keep existing variety
-      farmingMethod: crop.farmingMethod, // Keep existing farming method
-      qualityGrade: crop.qualityGrade, // Keep existing quality grade
-      moistureContent: crop.moistureContent, // Keep existing moisture content
-    };
+    setIsSubmitting(true);
 
-    onCropUpdated(crop.id, updatedCropData);
-  };
+    try {
+      const updatedCropData: Partial<Crop> = {
+        name: formData.name,
+        quantity: parseInt(formData.quantity),
+        price: parseFloat(formData.price),
+        description: formData.description,
+        category: formData.category,
+        harvestDate: formData.harvestDate,
+        images: imageUrls,
+        isOrganic: crop.isOrganic, // Keep existing organic status
+        certifications: crop.certifications, // Keep existing certifications
+        storageType: crop.storageType, // Keep existing storage type
+        shelfLife: crop.shelfLife, // Keep existing shelf life
+        minOrderQuantity: crop.minOrderQuantity, // Keep existing min order
+        availableFrom: crop.availableFrom, // Keep existing availability
+        availableTo: crop.availableTo, // Keep existing availability
+        cropVariety: crop.cropVariety, // Keep existing variety
+        farmingMethod: crop.farmingMethod, // Keep existing farming method
+        qualityGrade: crop.qualityGrade, // Keep existing quality grade
+        moistureContent: crop.moistureContent, // Keep existing moisture content
+      };
 
-  const addImageUrl = () => {
-    setImageUrls([...imageUrls, '']);
-  };
-
-  const removeImageUrl = (index: number) => {
-    setImageUrls(imageUrls.filter((_, i) => i !== index));
-  };
-
-  const updateImageUrl = (index: number, url: string) => {
-    const newUrls = [...imageUrls];
-    newUrls[index] = url;
-    setImageUrls(newUrls);
+      await onCropUpdated(crop.id, updatedCropData);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update crop. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -182,44 +180,21 @@ const EditCropForm: React.FC<EditCropFormProps> = ({ crop, onCropUpdated, onCanc
             />
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-2">
             <Label>Crop Images *</Label>
-            {imageUrls.map((url, index) => (
-              <div key={index} className="flex gap-2">
-                <Input
-                  value={url}
-                  onChange={(e) => updateImageUrl(index, e.target.value)}
-                  placeholder="Enter image URL"
-                  className="flex-1"
-                />
-                {imageUrls.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => removeImageUrl(index)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addImageUrl}
-              className="w-full"
-            >
-              <ImagePlus className="w-4 h-4 mr-2" />
-              Add Another Image
-            </Button>
+            <ImageUpload
+              onImagesChange={setImageUrls}
+              userId={user?.id || ''}
+              maxImages={5}
+              existingImages={imageUrls}
+            />
           </div>
 
           <div className="flex gap-4 pt-4">
-            <Button type="submit" className="flex-1">
-              Update Crop
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              {isSubmitting ? 'Updating Crop...' : 'Update Crop'}
             </Button>
-            <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+            <Button type="button" variant="outline" onClick={onCancel} className="flex-1" disabled={isSubmitting}>
               Cancel
             </Button>
           </div>

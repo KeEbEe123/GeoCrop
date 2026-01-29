@@ -5,10 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ImageUpload from '@/components/ui/image-upload';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Crop } from '@/types';
-import { ImagePlus, X } from 'lucide-react';
 
 interface AddCropFormProps {
   onCropAdded: (crop: Omit<Crop, 'id' | 'reviews' | 'averageRating' | 'totalSold'>) => void;
@@ -26,9 +26,10 @@ const AddCropForm: React.FC<AddCropFormProps> = ({ onCropAdded, onCancel }) => {
     category: '',
     harvestDate: ''
   });
-  const [imageUrls, setImageUrls] = useState<string[]>(['']);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!user) return;
@@ -43,70 +44,59 @@ const AddCropForm: React.FC<AddCropFormProps> = ({ onCropAdded, onCancel }) => {
       return;
     }
 
-    // Filter out empty image URLs
-    const validImages = imageUrls.filter(url => url.trim() !== '');
-    if (validImages.length === 0) {
+    // Check if images are uploaded
+    if (imageUrls.length === 0) {
       toast({
         title: "Images Required",
-        description: "Please add at least one image URL.",
+        description: "Please upload at least one image of your crop.",
         variant: "destructive"
       });
       return;
     }
 
-    const newCrop = {
-      name: formData.name,
-      farmer: user.name,
-      farmerId: user.id,
-      quantity: parseInt(formData.quantity),
-      price: parseFloat(formData.price),
-      location: user.location,
-      images: validImages,
-      description: formData.description,
-      category: formData.category,
-      harvestDate: formData.harvestDate,
-      isOrganic: false,
-      certifications: [],
-      storageType: 'fresh' as const,
-      shelfLife: 7,
-      minOrderQuantity: Math.max(1, Math.floor(parseInt(formData.quantity) / 10)),
-      availableFrom: formData.harvestDate || new Date().toISOString().split('T')[0],
-      availableTo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      cropVariety: 'Standard',
-      farmingMethod: 'conventional' as const,
-      qualityGrade: 'A' as const,
-      moistureContent: undefined,
-      coordinates: undefined,
-      featured: false
-    };
+    setIsSubmitting(true);
 
-    onCropAdded(newCrop);
+    try {
+      const newCrop = {
+        name: formData.name,
+        farmer: user.name,
+        farmerId: user.id,
+        quantity: parseInt(formData.quantity),
+        price: parseFloat(formData.price),
+        location: user.location,
+        images: imageUrls,
+        description: formData.description,
+        category: formData.category,
+        harvestDate: formData.harvestDate,
+        isOrganic: false,
+        certifications: [],
+        storageType: 'fresh' as const,
+        shelfLife: 7,
+        minOrderQuantity: Math.max(1, Math.floor(parseInt(formData.quantity) / 10)),
+        availableFrom: formData.harvestDate || new Date().toISOString().split('T')[0],
+        availableTo: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        cropVariety: 'Standard',
+        farmingMethod: 'conventional' as const,
+        qualityGrade: 'A' as const,
+        moistureContent: undefined,
+        coordinates: undefined,
+        featured: false
+      };
 
-    toast({
-      title: "Crop Data Prepared!",
-      description: `Your ${formData.name} is ready to be listed in the marketplace.`
-    });
-  };
+      await onCropAdded(newCrop);
 
-  const addImageUrl = () => {
-    setImageUrls([...imageUrls, '']);
-  };
-
-  const updateImageUrl = (index: number, url: string) => {
-    const updated = [...imageUrls];
-    // Process image URL to ensure it's treated as jpg/jpeg
-    let processedUrl = url.trim();
-    if (processedUrl && !processedUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-      // If no extension, assume it's a jpg
-      processedUrl = processedUrl + '.jpg';
-    }
-    updated[index] = processedUrl;
-    setImageUrls(updated);
-  };
-
-  const removeImageUrl = (index: number) => {
-    if (imageUrls.length > 1) {
-      setImageUrls(imageUrls.filter((_, i) => i !== index));
+      toast({
+        title: "Crop Listed Successfully!",
+        description: `Your ${formData.name} has been added to the marketplace.`
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to list your crop. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -183,35 +173,12 @@ const AddCropForm: React.FC<AddCropFormProps> = ({ onCropAdded, onCancel }) => {
 
           <div className="space-y-2">
             <Label>Crop Images *</Label>
-            <p className="text-sm text-muted-foreground">Add multiple images so buyers can verify quality</p>
-            {imageUrls.map((url, index) => (
-              <div key={index} className="flex gap-2">
-                <Input
-                  value={url}
-                  onChange={(e) => updateImageUrl(index, e.target.value)}
-                  placeholder="Enter image URL"
-                />
-                {imageUrls.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => removeImageUrl(index)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={addImageUrl}
-              className="w-full"
-            >
-              <ImagePlus className="w-4 h-4 mr-2" />
-              Add Another Image
-            </Button>
+            <ImageUpload
+              onImagesChange={setImageUrls}
+              userId={user?.id || ''}
+              maxImages={5}
+              existingImages={imageUrls}
+            />
           </div>
 
           <div className="space-y-2">
@@ -226,10 +193,10 @@ const AddCropForm: React.FC<AddCropFormProps> = ({ onCropAdded, onCancel }) => {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button type="submit" className="flex-1">
-              List Crop
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              {isSubmitting ? 'Listing Crop...' : 'List Crop'}
             </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
               Cancel
             </Button>
           </div>

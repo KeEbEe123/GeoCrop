@@ -9,6 +9,7 @@ import LoginForm from "./components/LoginForm";
 import RegisterForm from "./components/RegisterForm";
 import CropMarketplace from "./pages/CropMarketplace";
 import CropPrediction from "./pages/CropPrediction";
+import Dashboard from "./pages/Dashboard";
 import FarmerDashboard from "./pages/FarmerDashboard";
 import Home from "./pages/Home";
 import MarketAnalytics from "./pages/MarketAnalytics";
@@ -34,7 +35,8 @@ const App = () => (
             <Route path="/products" element={<ProductMarketplace />} />
             <Route path="/prediction" element={<CropPrediction />} />
             <Route path="/orders" element={<OrderManagement />} />
-            <Route path="/dashboard" element={<FarmerDashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/farmer-dashboard" element={<FarmerDashboard />} />
             <Route path="/analytics" element={<MarketAnalytics />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

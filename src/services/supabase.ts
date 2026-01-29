@@ -323,28 +323,81 @@ export class SupabaseService {
     try {
       const userField = userRole === 'buyer' ? 'buyer_id' : 'seller_id';
       
-      const { data, error } = await supabase
+      console.log('SupabaseService.getOrdersByUserId:', { userId, userRole, userField });
+      
+      // Get orders first
+      const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
-        .select(`
-          *,
-          buyer:users!orders_buyer_id_fkey(name),
-          seller:users!orders_seller_id_fkey(name),
-          crop:crops(name),
-          product:products(name)
-        `)
+        .select('*')
         .eq(userField, userId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        throw error;
+      console.log('Orders query result:', { ordersData, ordersError });
+
+      if (ordersError) {
+        throw ordersError;
       }
 
-      return data.map(row => mapDbRowToOrder({
+      if (!ordersData || ordersData.length === 0) {
+        return [];
+      }
+
+      // Get user names for buyers and sellers
+      const userIds = new Set<string>();
+      ordersData.forEach(order => {
+        userIds.add(order.buyer_id);
+        userIds.add(order.seller_id);
+      });
+
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, name')
+        .in('id', Array.from(userIds));
+
+      const userMap = new Map<string, string>();
+      usersData?.forEach(user => {
+        userMap.set(user.id, user.name);
+      });
+
+      // Get crop/product names
+      const cropIds = ordersData.filter(o => o.item_type === 'crop').map(o => o.item_id);
+      const productIds = ordersData.filter(o => o.item_type === 'product').map(o => o.item_id);
+
+      let cropMap = new Map<string, string>();
+      let productMap = new Map<string, string>();
+
+      if (cropIds.length > 0) {
+        const { data: cropsData } = await supabase
+          .from('crops')
+          .select('id, name')
+          .in('id', cropIds);
+        
+        cropsData?.forEach(crop => {
+          cropMap.set(crop.id, crop.name);
+        });
+      }
+
+      if (productIds.length > 0) {
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('id, name')
+          .in('id', productIds);
+        
+        productsData?.forEach(product => {
+          productMap.set(product.id, product.name);
+        });
+      }
+
+      // Map the data to Order objects with names
+      const mappedOrders = ordersData.map(row => mapDbRowToOrder({
         ...row,
-        buyer_name: row.buyer?.name,
-        seller_name: row.seller?.name,
-        item_name: row.item_type === 'crop' ? row.crop?.name : row.product?.name
+        buyer_name: userMap.get(row.buyer_id),
+        seller_name: userMap.get(row.seller_id),
+        item_name: row.item_type === 'crop' ? cropMap.get(row.item_id) : productMap.get(row.item_id)
       }));
+
+      console.log('Mapped orders:', mappedOrders);
+      return mappedOrders;
     } catch (error) {
       console.error('Error fetching orders:', error);
       return [];
@@ -362,6 +415,21 @@ export class SupabaseService {
     } catch (error) {
       console.error('Error updating order status:', error);
       return false;
+    }
+  }
+
+  // Debug method to get all orders
+  static async getAllOrdersDebug(): Promise<any[]> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*');
+
+      console.log('All orders in database:', { data, error });
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching all orders:', error);
+      return [];
     }
   }
 }
