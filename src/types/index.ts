@@ -10,6 +10,7 @@ export interface User {
   rating: number;
   joinDate: string;
   totalOrders: number;
+  totalRatings?: number;
   coordinates?: {
     lat: number;
     lng: number;

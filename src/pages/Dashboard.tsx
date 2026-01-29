@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCrops } from '@/hooks/useCrops';
 import { useOrders } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
+import OrderStatusChip from '@/components/OrderStatusChip';
 import {
     AlertTriangle,
     BarChart3,

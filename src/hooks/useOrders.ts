@@ -42,12 +42,12 @@ export const useOrders = (userId?: string, userRole?: 'buyer' | 'seller') => {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+  const updateOrderStatus = async (orderId: string, status: Order['status'], updates?: Partial<Order>) => {
     try {
-      const success = await SupabaseService.updateOrderStatus(orderId, status);
+      const success = await SupabaseService.updateOrderStatus(orderId, status, updates);
       if (success) {
         setOrders(prev => prev.map(order => 
-          order.id === orderId ? { ...order, status } : order
+          order.id === orderId ? { ...order, status, ...updates } : order
         ));
         return true;
       }

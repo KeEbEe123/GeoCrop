@@ -7,6 +7,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
 import { Order } from '@/types';
+import OrderStatusChip from '@/components/OrderStatusChip';
+import OrderStatusUpdater from '@/components/OrderStatusUpdater';
+import OrderRatingModal from '@/components/OrderRatingModal';
 import {
     Calendar,
     CheckCircle,
@@ -17,7 +20,9 @@ import {
     Search,
     Truck,
     User,
-    X
+    X,
+    Edit,
+    Star
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -27,12 +32,33 @@ const OrderManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showStatusUpdater, setShowStatusUpdater] = useState<string | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState<Order | null>(null);
 
   // Use real orders from Supabase
   const { orders, loading, error, updateOrderStatus, refetch } = useOrders(
     user?.id, 
     user?.role === 'farmer' ? 'seller' : user?.role === 'buyer' ? 'buyer' : undefined
   );
+
+  // Enhanced status update function
+  const handleStatusUpdate = async (orderId: string, newStatus: Order['status'], updates?: Partial<Order>) => {
+    try {
+      await updateOrderStatus(orderId, newStatus, updates);
+      toast({
+        title: "Order Updated",
+        description: `Order status updated to ${newStatus.replace('_', ' ')}`,
+      });
+      refetch(); // Refresh the orders list
+      setShowStatusUpdater(null); // Close the status updater
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update order status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Filter orders based on search and status
   const filteredOrders = useMemo(() => {
@@ -80,23 +106,6 @@ const OrderManagement = () => {
       case 'cancelled': return <X className="w-4 h-4" />;
       case 'returned': return <Package className="w-4 h-4" />;
       default: return <Clock className="w-4 h-4" />;
-    }
-  };
-
-  const handleStatusUpdate = async (orderId: string, newStatus: Order['status']) => {
-    try {
-      await updateOrderStatus(orderId, newStatus);
-      toast({
-        title: "Order Updated",
-        description: `Order ${orderId} status updated to ${newStatus}`,
-      });
-      refetch(); // Refresh the orders list
-    } catch (error) {
-      toast({
-        title: "Update Failed",
-        description: "Failed to update order status. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -253,10 +262,7 @@ const OrderManagement = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold">{order.item}</h3>
-                      <Badge className={getStatusColor(order.status)}>
-                        {getStatusIcon(order.status)}
-                        <span className="ml-1 capitalize">{order.status.replace('_', ' ')}</span>
-                      </Badge>
+                      <OrderStatusChip status={order.status} />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
@@ -296,12 +302,24 @@ const OrderManagement = () => {
                       <Eye className="w-4 h-4 mr-2" />
                       View Details
                     </Button>
-                    {user.role === 'farmer' && order.status === 'pending' && (
+                    {user.role === 'farmer' && ['pending', 'confirmed', 'in_transit'].includes(order.status) && (
                       <Button
+                        variant="outline"
                         size="sm"
-                        onClick={() => handleStatusUpdate(order.id, 'confirmed')}
+                        onClick={() => setShowStatusUpdater(order.id)}
                       >
-                        Confirm Order
+                        <Edit className="w-4 h-4 mr-2" />
+                        Update Status
+                      </Button>
+                    )}
+                    {order.status === 'delivered' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowRatingModal(order)}
+                      >
+                        <Star className="w-4 h-4 mr-2" />
+                        Rate Order
                       </Button>
                     )}
                   </div>
@@ -351,9 +369,7 @@ const OrderManagement = () => {
                       </div>
                       <div className="flex justify-between">
                         <span>Status:</span>
-                        <Badge className={getStatusColor(selectedOrder.status)}>
-                          {selectedOrder.status.replace('_', ' ')}
-                        </Badge>
+                        <OrderStatusChip status={selectedOrder.status} />
                       </div>
                     </div>
                   </div>
@@ -403,6 +419,8 @@ const OrderManagement = () => {
                       <Badge className={
                         selectedOrder.paymentStatus === 'paid' 
                           ? 'bg-green-100 text-green-800'
+                          : selectedOrder.paymentStatus === 'failed'
+                          ? 'bg-red-100 text-red-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }>
                         {selectedOrder.paymentStatus}
@@ -443,6 +461,41 @@ const OrderManagement = () => {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* Status Updater Modal */}
+        {showStatusUpdater && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-end mb-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowStatusUpdater(null)}
+                  className="bg-white"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <OrderStatusUpdater
+                order={filteredOrders.find(o => o.id === showStatusUpdater)!}
+                onStatusUpdate={handleStatusUpdate}
+                userRole={user.role}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Rating Modal */}
+        {showRatingModal && (
+          <OrderRatingModal
+            order={showRatingModal}
+            onClose={() => setShowRatingModal(null)}
+            onRatingSubmitted={() => {
+              refetch();
+              setShowRatingModal(null);
+            }}
+          />
         )}
       </div>
     </div>

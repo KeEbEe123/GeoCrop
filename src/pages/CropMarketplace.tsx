@@ -2,6 +2,8 @@ import AddCropForm from '@/components/forms/AddCropForm';
 import EditCropForm from '@/components/forms/EditCropForm';
 import ImageGallery from '@/components/ImageGallery';
 import OrderConfirmationDialog from '@/components/OrderConfirmationDialog';
+import RatingDisplay from '@/components/RatingDisplay';
+import RatingsSection from '@/components/RatingsSection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +18,7 @@ import { useCrops } from '@/hooks/useCrops';
 import { useOrders } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
 import { Crop } from '@/types';
-import { ChevronDown, Edit, Filter, IndianRupee, Leaf, MapPin, Package, Plus, Search, Star, Trash2, Truck, User } from 'lucide-react';
+import { ChevronDown, Edit, Filter, IndianRupee, Leaf, MapPin, Package, Plus, Search, Star, Trash2, Truck, User, X } from 'lucide-react';
 import React, { useState } from 'react';
 
 const CropMarketplace = () => {
@@ -43,6 +45,7 @@ const CropMarketplace = () => {
     quantity: number;
   }>({ isOpen: false, crop: null, quantity: 0 });
   const [orderQuantities, setOrderQuantities] = useState<Record<string, number>>({});
+  const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
 
   React.useEffect(() => {
     let filtered = crops;
@@ -499,19 +502,10 @@ const CropMarketplace = () => {
                           Grade {crop.qualityGrade}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-1 mb-2">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`w-4 h-4 ${
-                              i < Math.floor(crop.averageRating)
-                                ? 'text-yellow-400 fill-current'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                        <span className="text-sm text-muted-foreground ml-1">
-                          {crop.averageRating.toFixed(1)} ({crop.reviews.length} reviews)
+                      <div className="flex items-center gap-2 mb-2">
+                        <RatingDisplay rating={crop.averageRating} size="sm" />
+                        <span className="text-sm text-muted-foreground">
+                          ({crop.reviews.length} reviews)
                         </span>
                       </div>
                     </div>
@@ -579,13 +573,22 @@ const CropMarketplace = () => {
                               className="w-20 h-8"
                             />
                           </div>
-                          <Button 
-                            onClick={() => handleOrder(crop)}
-                            disabled={crop.quantity === 0}
-                            size="sm"
-                          >
-                            {crop.quantity === 0 ? 'Sold Out' : 'Order Now'}
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button 
+                              onClick={() => handleOrder(crop)}
+                              disabled={crop.quantity === 0}
+                              size="sm"
+                            >
+                              {crop.quantity === 0 ? 'Sold Out' : 'Order Now'}
+                            </Button>
+                            <Button 
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedCrop(crop)}
+                            >
+                              View Details
+                            </Button>
+                          </div>
                         </div>
                       ) : user?.role === 'farmer' && user.name === crop.farmer ? (
                         <div className="flex gap-2 ml-4">
@@ -665,6 +668,157 @@ const CropMarketplace = () => {
           </div>
         )}
       </div>
+
+      {/* Detailed Crop View Modal */}
+      {selectedCrop && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="max-w-4xl w-full max-h-[90vh] overflow-y-auto bg-white rounded-lg">
+            <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+              <h2 className="text-2xl font-bold">{selectedCrop.name}</h2>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedCrop(null)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Crop Images */}
+              {selectedCrop.images.length > 0 && (
+                <div>
+                  <ImageGallery images={selectedCrop.images} />
+                </div>
+              )}
+
+              {/* Crop Information */}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Crop Details</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Farmer:</span>
+                        <span className="font-medium">{selectedCrop.farmer}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Location:</span>
+                        <span>{selectedCrop.location}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Category:</span>
+                        <span>{selectedCrop.category}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Quality Grade:</span>
+                        <span>Grade {selectedCrop.qualityGrade}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Farming Method:</span>
+                        <span className="capitalize">{selectedCrop.farmingMethod}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Storage Type:</span>
+                        <span className="capitalize">{selectedCrop.storageType.replace('_', ' ')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Shelf Life:</span>
+                        <span>{selectedCrop.shelfLife} days</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Pricing & Availability</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Price per kg:</span>
+                        <span className="font-medium text-lg">₹{selectedCrop.price}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Available Quantity:</span>
+                        <span>{selectedCrop.quantity} kg</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Min Order:</span>
+                        <span>{selectedCrop.minOrderQuantity} kg</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Available From:</span>
+                        <span>{new Date(selectedCrop.availableFrom).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Available To:</span>
+                        <span>{new Date(selectedCrop.availableTo).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">Description</h3>
+                    <p className="text-sm text-muted-foreground">{selectedCrop.description}</p>
+                  </div>
+
+                  {selectedCrop.certifications.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">Certifications</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCrop.certifications.map((cert, index) => (
+                          <Badge key={index} className="bg-green-100 text-green-800">
+                            {cert}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {user?.role === 'buyer' && (
+                    <div className="p-4 border rounded-lg">
+                      <h3 className="text-lg font-semibold mb-3">Place Order</h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="modal-quantity">Quantity (kg):</Label>
+                          <Input
+                            id="modal-quantity"
+                            type="number"
+                            min={selectedCrop.minOrderQuantity}
+                            max={selectedCrop.quantity}
+                            value={orderQuantities[selectedCrop.id] || selectedCrop.minOrderQuantity}
+                            onChange={(e) => setOrderQuantities({
+                              ...orderQuantities,
+                              [selectedCrop.id]: parseInt(e.target.value) || selectedCrop.minOrderQuantity
+                            })}
+                            className="w-24"
+                          />
+                        </div>
+                        <div className="text-lg font-semibold">
+                          Total: ₹{((orderQuantities[selectedCrop.id] || selectedCrop.minOrderQuantity) * selectedCrop.price).toLocaleString()}
+                        </div>
+                        <Button 
+                          onClick={() => {
+                            handleOrder(selectedCrop);
+                            setSelectedCrop(null);
+                          }}
+                          disabled={selectedCrop.quantity === 0}
+                          className="w-full"
+                        >
+                          {selectedCrop.quantity === 0 ? 'Sold Out' : 'Place Order'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Ratings Section */}
+              <RatingsSection
+                entityType="crop"
+                entityId={selectedCrop.id}
+                entityName={selectedCrop.name}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

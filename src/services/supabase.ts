@@ -404,11 +404,21 @@ export class SupabaseService {
     }
   }
 
-  static async updateOrderStatus(orderId: string, status: Order['status']): Promise<boolean> {
+  static async updateOrderStatus(orderId: string, status: Order['status'], updates?: Partial<Order>): Promise<boolean> {
     try {
+      const updateData: any = { status };
+      
+      // Add additional updates if provided
+      if (updates) {
+        if (updates.trackingId !== undefined) updateData.tracking_id = updates.trackingId;
+        if (updates.notes !== undefined) updateData.notes = updates.notes;
+        if (updates.expectedDelivery !== undefined) updateData.expected_delivery = updates.expectedDelivery;
+        if (updates.actualDelivery !== undefined) updateData.actual_delivery = updates.actualDelivery;
+      }
+
       const { error } = await supabase
         .from('orders')
-        .update({ status })
+        .update(updateData)
         .eq('id', orderId);
 
       return !error;
