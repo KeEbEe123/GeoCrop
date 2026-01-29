@@ -1,4 +1,5 @@
 import AddCropForm from '@/components/forms/AddCropForm';
+import EditCropForm from '@/components/forms/EditCropForm';
 import ImageGallery from '@/components/ImageGallery';
 import OrderConfirmationDialog from '@/components/OrderConfirmationDialog';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +22,7 @@ import React, { useState } from 'react';
 const CropMarketplace = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { crops, loading, addCrop, deleteCrop, getCropsByFarmer } = useCrops();
+  const { crops, loading, addCrop, updateCrop, deleteCrop, getCropsByFarmer } = useCrops();
   const { createOrder } = useOrders();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +35,8 @@ const CropMarketplace = () => {
   const [sortBy, setSortBy] = useState<string>('featured');
   const [filteredCrops, setFilteredCrops] = useState<Crop[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingCrop, setEditingCrop] = useState<Crop | null>(null);
   const [orderConfirmation, setOrderConfirmation] = useState<{
     isOpen: boolean;
     crop: Crop | null;
@@ -210,11 +213,27 @@ const CropMarketplace = () => {
     }
   };
 
-  const handleEditCrop = (cropName: string) => {
-    toast({
-      title: "Edit Crop",
-      description: `Edit feature for ${cropName} will be implemented soon.`,
-    });
+  const handleEditCrop = (crop: Crop) => {
+    setEditingCrop(crop);
+    setShowEditForm(true);
+  };
+
+  const handleCropUpdated = async (cropId: string, updatedData: Partial<Crop>) => {
+    const success = await updateCrop(cropId, updatedData);
+    if (success) {
+      toast({
+        title: "Crop Updated",
+        description: "Your crop listing has been updated successfully.",
+      });
+      setShowEditForm(false);
+      setEditingCrop(null);
+    } else {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update crop. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteCrop = async (cropId: string, cropName: string) => {
@@ -428,7 +447,7 @@ const CropMarketplace = () => {
           </div>
         </div>
 
-        {/* Crops Grid or Add Form */}
+        {/* Crops Grid or Add Form or Edit Form */}
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -438,6 +457,15 @@ const CropMarketplace = () => {
           <AddCropForm 
             onCropAdded={handleCropAdded}
             onCancel={() => setShowAddForm(false)}
+          />
+        ) : showEditForm && editingCrop ? (
+          <EditCropForm 
+            crop={editingCrop}
+            onCropUpdated={handleCropUpdated}
+            onCancel={() => {
+              setShowEditForm(false);
+              setEditingCrop(null);
+            }}
           />
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -564,7 +592,7 @@ const CropMarketplace = () => {
                           <Button 
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEditCrop(crop.name)}
+                            onClick={() => handleEditCrop(crop)}
                           >
                             <Edit className="w-4 h-4 mr-1" />
                             Edit

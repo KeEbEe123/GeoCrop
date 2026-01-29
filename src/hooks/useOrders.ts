@@ -44,12 +44,14 @@ export const useOrders = (userId?: string, userRole?: 'buyer' | 'seller') => {
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
     try {
-      // TODO: Implement updateOrderStatus in SupabaseService
-      // For now, just update locally
-      setOrders(prev => prev.map(order => 
-        order.id === orderId ? { ...order, status } : order
-      ));
-      return true;
+      const success = await SupabaseService.updateOrderStatus(orderId, status);
+      if (success) {
+        setOrders(prev => prev.map(order => 
+          order.id === orderId ? { ...order, status } : order
+        ));
+        return true;
+      }
+      return false;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update order');
       return false;

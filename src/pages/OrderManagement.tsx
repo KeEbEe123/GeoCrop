@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockOrders } from '@/data/mockData';
+import { useOrders } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
 import { Order } from '@/types';
 import {
@@ -28,37 +28,36 @@ const OrderManagement = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  // Filter orders based on user role
-  const userOrders = useMemo(() => {
-    if (!user) return [];
+  // Use real orders from Supabase
+  const { orders, loading, error, updateOrderStatus, refetch } = useOrders(
+    user?.id, 
+    user?.role === 'farmer' ? 'seller' : user?.role === 'buyer' ? 'buyer' : undefined
+  );
+
+  // Filter orders based on search and status
+  const filteredOrders = useMemo(() => {
+    if (!orders) return [];
     
-    let filtered = mockOrders;
-    
-    // Filter by user role
-    if (user.role === 'farmer') {
-      filtered = filtered.filter(order => order.sellerId === user.id);
-    } else if (user.role === 'buyer') {
-      filtered = filtered.filter(order => order.buyerId === user.id);
-    } else {
-      return []; // Sellers don't have orders in this context
-    }
+    let filtered = orders;
     
     // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(order =>
         order.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.buyer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.seller.toLowerCase().includes(searchTerm.toLowerCase()) ||
         order.trackingId?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     // Apply status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
-    
-    return filtered;
-  }, [user, searchTerm, statusFilter]);
+
+    return filtered.sort((a, b) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime());
+  }, [orders, searchTerm, statusFilter]);
 
   const getStatusColor = (status: Order['status']) => {
     switch (status) {
@@ -84,25 +83,63 @@ const OrderManagement = () => {
     }
   };
 
-  const handleStatusUpdate = (orderId: string, newStatus: Order['status']) => {
-    // In a real app, this would make an API call
-    toast({
-      title: "Order Updated",
-      description: `Order ${orderId} status updated to ${newStatus}`,
-    });
+  const handleStatusUpdate = async (orderId: string, newStatus: Order['status']) => {
+    try {
+      await updateOrderStatus(orderId, newStatus);
+      toast({
+        title: "Order Updated",
+        description: `Order ${orderId} status updated to ${newStatus}`,
+      });
+      refetch(); // Refresh the orders list
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update order status. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getOrderSummary = () => {
-    const total = userOrders.length;
-    const pending = userOrders.filter(o => o.status === 'pending').length;
-    const confirmed = userOrders.filter(o => o.status === 'confirmed').length;
-    const inTransit = userOrders.filter(o => o.status === 'in_transit').length;
-    const delivered = userOrders.filter(o => o.status === 'delivered').length;
+    const total = filteredOrders.length;
+    const pending = filteredOrders.filter(o => o.status === 'pending').length;
+    const confirmed = filteredOrders.filter(o => o.status === 'confirmed').length;
+    const inTransit = filteredOrders.filter(o => o.status === 'in_transit').length;
+    const delivered = filteredOrders.filter(o => o.status === 'delivered').length;
     
     return { total, pending, confirmed, inTransit, delivered };
   };
 
   const summary = getOrderSummary();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-sky flex items-center justify-center">
+        <Card className="max-w-md mx-auto text-center">
+          <CardHeader>
+            <CardTitle>Loading Orders...</CardTitle>
+            <CardDescription>Please wait while we fetch your orders.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-sky flex items-center justify-center">
+        <Card className="max-w-md mx-auto text-center">
+          <CardHeader>
+            <CardTitle>Error Loading Orders</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => refetch()}>Try Again</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -195,7 +232,21 @@ const OrderManagement = () => {
 
         {/* Orders List */}
         <div className="space-y-4">
-          {userOrders.map((order) => (
+          {filteredOrders.length === 0 ? (
+            <Card className="text-center py-12">
+              <CardContent>
+                <Package className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Orders Found</h3>
+                <p className="text-muted-foreground">
+                  {user?.role === 'farmer' 
+                    ? "You haven't received any orders yet. List your crops to start selling!"
+                    : "You haven't placed any orders yet. Browse the marketplace to start buying!"
+                  }
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            filteredOrders.map((order) => (
             <Card key={order.id} className="hover:shadow-natural transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -257,20 +308,9 @@ const OrderManagement = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          ))
+          )}
         </div>
-
-        {userOrders.length === 0 && (
-          <div className="text-center py-12">
-            <Package className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-xl text-muted-foreground">
-              {user.role === 'farmer' 
-                ? "You don't have any sales yet. Start listing your crops to receive orders!"
-                : "You haven't placed any orders yet. Start shopping in the marketplace!"
-              }
-            </p>
-          </div>
-        )}
 
         {/* Order Details Modal */}
         {selectedOrder && (

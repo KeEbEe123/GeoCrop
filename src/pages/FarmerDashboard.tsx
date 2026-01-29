@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockCrops, mockMarketAnalytics, mockOrders } from '@/data/mockData';
+import { mockCrops, mockMarketAnalytics } from '@/data/mockData';
+import { useOrders } from '@/hooks/useOrders';
 import {
     AlertTriangle,
     BarChart3,
@@ -23,18 +24,21 @@ const FarmerDashboard = () => {
   const { user } = useAuth();
   const [selectedPeriod, setSelectedPeriod] = useState('month');
 
+  // Use real orders from Supabase
+  const { orders: farmerOrders, loading: ordersLoading } = useOrders(user?.id, 'seller');
+
   // Calculate farmer statistics
   const farmerStats = useMemo(() => {
     if (!user) return null;
 
     const farmerCrops = mockCrops.filter(crop => crop.farmerId === user.id);
-    const farmerOrders = mockOrders.filter(order => order.sellerId === user.id);
+    const orders = farmerOrders || [];
     
-    const totalRevenue = farmerOrders
+    const totalRevenue = orders
       .filter(order => order.status === 'delivered')
       .reduce((sum, order) => sum + order.totalAmount, 0);
     
-    const totalQuantitySold = farmerOrders
+    const totalQuantitySold = orders
       .filter(order => order.status === 'delivered')
       .reduce((sum, order) => sum + order.quantity, 0);
     
@@ -44,8 +48,8 @@ const FarmerDashboard = () => {
       ? farmerCrops.reduce((sum, crop) => sum + crop.averageRating, 0) / farmerCrops.length
       : 0;
     
-    const pendingOrders = farmerOrders.filter(order => order.status === 'pending').length;
-    const completedOrders = farmerOrders.filter(order => order.status === 'delivered').length;
+    const pendingOrders = orders.filter(order => order.status === 'pending').length;
+    const completedOrders = orders.filter(order => order.status === 'delivered').length;
     const activeListings = farmerCrops.filter(crop => crop.quantity > 0).length;
     
     return {
@@ -57,9 +61,9 @@ const FarmerDashboard = () => {
       completedOrders,
       activeListings,
       totalCrops: farmerCrops.length,
-      totalOrders: farmerOrders.length
+      totalOrders: orders.length
     };
-  }, [user]);
+  }, [user, farmerOrders]);
 
   // Revenue data for chart
   const revenueData = [

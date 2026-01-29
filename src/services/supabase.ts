@@ -350,4 +350,18 @@ export class SupabaseService {
       return [];
     }
   }
+
+  static async updateOrderStatus(orderId: string, status: Order['status']): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', orderId);
+
+      return !error;
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      return false;
+    }
+  }
 }
