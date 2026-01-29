@@ -5,9 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import Chatbot from '@/components/Chatbot';
-import { locationData } from '@/data/mockData';
 import { useToast } from '@/hooks/use-toast';
 import { PredictionResult } from '@/types';
+import { predictCrop } from '@/services/cropPrediction';
 import {
     Brain,
     MapPin,
@@ -25,19 +25,35 @@ const CropPrediction = () => {
 
   const handlePredict = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!coordinates.lat || !coordinates.lng) {
+      toast({
+        title: "Error",
+        description: "Please enter both latitude and longitude",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
-    setTimeout(() => {
-      const coordKey = `${coordinates.lat},${coordinates.lng}`;
-      const result = locationData[coordKey] || locationData['default'];
-      
+    try {
+      const result = await predictCrop(parseFloat(coordinates.lat), parseFloat(coordinates.lng));
       setPrediction(result);
       toast({
         title: "Prediction Complete!",
         description: `${result.crop} recommended with ${result.confidence}% confidence`,
       });
+    } catch (error) {
+      console.error('Prediction error:', error);
+      toast({
+        title: "Prediction Failed",
+        description: "Unable to get crop prediction. Please check if the Flask server is running.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   return (
@@ -138,30 +154,30 @@ const CropPrediction = () => {
                       Soil Data
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="flex justify-between">
-                        <span>pH Level:</span>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">pH Level:</span>
                         <span className="font-medium">{prediction.soilData.pH}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Organic Matter:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Organic Matter:</span>
                         <span className="font-medium">{prediction.soilData.organicMatter}%</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Nitrogen:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Nitrogen:</span>
                         <span className="font-medium">{prediction.soilData.nitrogen} ppm</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Phosphorus:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Phosphorus:</span>
                         <span className="font-medium">{prediction.soilData.phosphorus} ppm</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Potassium:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Potassium:</span>
                         <span className="font-medium">{prediction.soilData.potassium} ppm</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Clay Content:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Clay Content:</span>
                         <span className="font-medium">{prediction.soilData.clay}%</span>
                       </div>
                     </div>
@@ -175,26 +191,26 @@ const CropPrediction = () => {
                       Weather Data
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="flex justify-between">
-                        <span>Temperature:</span>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Temperature:</span>
                         <span className="font-medium">{prediction.weatherData.temperature}°C</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Humidity:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Humidity:</span>
                         <span className="font-medium">{prediction.weatherData.humidity}%</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Rainfall:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Rainfall:</span>
                         <span className="font-medium">{prediction.weatherData.rainfall}mm</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Wind Speed:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Wind Speed:</span>
                         <span className="font-medium">{prediction.weatherData.windSpeed} km/h</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Sunlight:</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Sunlight:</span>
                         <span className="font-medium">{prediction.weatherData.sunlightHours} hrs/day</span>
                       </div>
                     </div>

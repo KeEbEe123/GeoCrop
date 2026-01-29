@@ -1,0 +1,9 @@
+Flask
+Flask-CORS
+pandas
+scikit-learn
+geopy
+numpy
+requests
+python-dotenv
+gunicorn
