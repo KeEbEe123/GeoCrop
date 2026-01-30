@@ -59,8 +59,10 @@ const mapDbRowToOrder = (row: any): Order => {
     id: row.id,
     buyer: row.buyer_name || 'Unknown Buyer',
     buyerId: row.buyer_id,
+    buyerEmail: row.buyer_email,
     seller: row.seller_name || 'Unknown Seller',
     sellerId: row.seller_id,
+    sellerEmail: row.seller_email,
     item: row.item_name || 'Unknown Item',
     itemId: row.item_id,
     quantity: row.quantity,
@@ -231,6 +233,25 @@ export class SupabaseService {
     }
   }
 
+  static async getUserById(userId: string): Promise<User | null> {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error || !data) {
+        return null;
+      }
+
+      return mapDbRowToUser(data);
+    } catch (error) {
+      console.error('Error fetching user by ID:', error);
+      return null;
+    }
+  }
+
   static async authenticateUser(email: string, passwordHash: string): Promise<User | null> {
     try {
       const { data, error } = await supabase
@@ -342,7 +363,7 @@ export class SupabaseService {
         return [];
       }
 
-      // Get user names for buyers and sellers
+      // Get user names and emails for buyers and sellers
       const userIds = new Set<string>();
       ordersData.forEach(order => {
         userIds.add(order.buyer_id);
@@ -351,12 +372,12 @@ export class SupabaseService {
 
       const { data: usersData } = await supabase
         .from('users')
-        .select('id, name')
+        .select('id, name, email')
         .in('id', Array.from(userIds));
 
-      const userMap = new Map<string, string>();
+      const userMap = new Map<string, { name: string; email: string }>();
       usersData?.forEach(user => {
-        userMap.set(user.id, user.name);
+        userMap.set(user.id, { name: user.name, email: user.email });
       });
 
       // Get crop/product names
@@ -388,11 +409,13 @@ export class SupabaseService {
         });
       }
 
-      // Map the data to Order objects with names
+      // Map the data to Order objects with names and emails
       const mappedOrders = ordersData.map(row => mapDbRowToOrder({
         ...row,
-        buyer_name: userMap.get(row.buyer_id),
-        seller_name: userMap.get(row.seller_id),
+        buyer_name: userMap.get(row.buyer_id)?.name,
+        buyer_email: userMap.get(row.buyer_id)?.email,
+        seller_name: userMap.get(row.seller_id)?.name,
+        seller_email: userMap.get(row.seller_id)?.email,
         item_name: row.item_type === 'crop' ? cropMap.get(row.item_id) : productMap.get(row.item_id)
       }));
 

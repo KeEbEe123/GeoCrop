@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { SupabaseService } from '@/services/supabase';
+import { emailServiceClient } from '@/services/emailService';
 import { hashPassword, validateEmail, validatePassword } from '@/utils/auth';
 import { User } from '@/types';
 import { AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -98,6 +99,27 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSucces
       if (!newUser) {
         throw new Error('Failed to create account. Please try again.');
       }
+
+      // Send welcome email (don't await to prevent blocking registration)
+      console.log('🚀 Attempting to send welcome email for new user:', newUser.email);
+      emailServiceClient.sendWelcomeEmail({
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        location: newUser.location
+      }).then((result) => {
+        if (result.success) {
+          console.log('✅ Welcome email sent successfully');
+          toast({
+            title: "Welcome Email Sent!",
+            description: "Check your email for a welcome message with getting started tips.",
+          });
+        } else {
+          console.warn('⚠️ Welcome email failed to send:', result.message);
+        }
+      }).catch((error) => {
+        console.warn('⚠️ Welcome email service error:', error);
+      });
 
       toast({
         title: "Account Created!",

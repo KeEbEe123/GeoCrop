@@ -20,9 +20,9 @@ const LoginForm = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const success = login(email, password);
+    try {
+      const success = await login(email, password);
+      
       if (success) {
         toast({
           title: "Welcome back!",
@@ -32,12 +32,19 @@ const LoginForm = () => {
       } else {
         toast({
           title: "Login failed",
-          description: "Invalid email or password. Try: ramesh@farm.com",
+          description: "Invalid email or password.",
           variant: "destructive",
         });
       }
+    } catch (error) {
+      toast({
+        title: "Login failed",
+        description: "There was an error logging in. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -49,7 +56,7 @@ const LoginForm = () => {
           </div>
           <CardTitle className="text-2xl">Welcome Back</CardTitle>
           <CardDescription>
-            Sign in to your SmartAgri account
+            Sign in to your Yield Mentor account
           </CardDescription>
         </CardHeader>
         <CardContent>

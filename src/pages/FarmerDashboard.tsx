@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { mockCrops, mockMarketAnalytics } from '@/data/mockData';
+import { mockCrops, mockMarketAnalytics, mockOrders } from '@/data/mockData';
 import { useOrders } from '@/hooks/useOrders';
 import {
     AlertTriangle,
@@ -65,15 +65,37 @@ const FarmerDashboard = () => {
     };
   }, [user, farmerOrders]);
 
-  // Revenue data for chart
-  const revenueData = [
-    { month: 'Oct', revenue: 45000, orders: 12 },
-    { month: 'Nov', revenue: 52000, orders: 15 },
-    { month: 'Dec', revenue: 48000, orders: 13 },
-    { month: 'Jan', revenue: 67000, orders: 18 },
-    { month: 'Feb', revenue: 55000, orders: 16 },
-    { month: 'Mar', revenue: 72000, orders: 21 }
-  ];
+  // Revenue data for chart - enhanced with more realistic data
+  const revenueData = useMemo(() => {
+    if (!user) return [];
+    
+    // Generate revenue data based on actual orders and some historical data
+    const farmerOrders = mockOrders.filter(order => order.sellerId === user.id);
+    const deliveredOrders = farmerOrders.filter(order => order.status === 'delivered');
+    
+    // Base historical data with some variation
+    const baseData = [
+      { month: 'Aug', revenue: 42000, orders: 11 },
+      { month: 'Sep', revenue: 38000, orders: 9 },
+      { month: 'Oct', revenue: 45000, orders: 12 },
+      { month: 'Nov', revenue: 52000, orders: 15 },
+      { month: 'Dec', revenue: 48000, orders: 13 },
+      { month: 'Jan', revenue: 67000, orders: 18 }
+    ];
+    
+    // Add current month data based on actual orders
+    const currentRevenue = deliveredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const currentMonth = new Date().toLocaleDateString('en-US', { month: 'short' });
+    
+    // Update current month if it exists in base data
+    const updatedData = baseData.map(item => 
+      item.month === currentMonth 
+        ? { ...item, revenue: Math.max(item.revenue, currentRevenue), orders: Math.max(item.orders, deliveredOrders.length) }
+        : item
+    );
+    
+    return updatedData;
+  }, [user]);
 
   // Crop performance data
   const cropPerformanceData = useMemo(() => {
@@ -220,55 +242,190 @@ const FarmerDashboard = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
+            {/* Quick Insights */}
+            <div className="grid md:grid-cols-3 gap-4 mb-6">
+              <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Monthly Growth</p>
+                      <p className="text-2xl font-bold text-green-900">+12%</p>
+                      <p className="text-xs text-green-600">vs last month</p>
+                    </div>
+                    <TrendingUp className="w-8 h-8 text-green-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">Order Completion</p>
+                      <p className="text-2xl font-bold text-blue-900">
+                        {farmerStats.totalOrders > 0 
+                          ? Math.round((farmerStats.completedOrders / farmerStats.totalOrders) * 100)
+                          : 0
+                        }%
+                      </p>
+                      <p className="text-xs text-blue-600">success rate</p>
+                    </div>
+                    <CheckCircle className="w-8 h-8 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-purple-800">Avg Order Value</p>
+                      <p className="text-2xl font-bold text-purple-900">
+                        ₹{farmerStats.completedOrders > 0 
+                          ? Math.round(farmerStats.totalRevenue / farmerStats.completedOrders).toLocaleString()
+                          : 0
+                        }
+                      </p>
+                      <p className="text-xs text-purple-600">per order</p>
+                    </div>
+                    <IndianRupee className="w-8 h-8 text-purple-600" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <div className="grid lg:grid-cols-2 gap-6">
               {/* Revenue Trend */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Revenue Trend</CardTitle>
-                  <CardDescription>Monthly revenue and order count</CardDescription>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-green-600" />
+                    Revenue Trend
+                  </CardTitle>
+                  <CardDescription>Monthly revenue and order count over time</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={300}>
                     <LineChart data={revenueData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip formatter={(value, name) => [
-                        name === 'revenue' ? `₹${value.toLocaleString()}` : value,
-                        name === 'revenue' ? 'Revenue' : 'Orders'
-                      ]} />
-                      <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} />
-                      <Line type="monotone" dataKey="orders" stroke="#3b82f6" strokeWidth={2} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                      <XAxis 
+                        dataKey="month" 
+                        tick={{ fontSize: 12 }}
+                        axisLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                        axisLine={{ stroke: '#e0e0e0' }}
+                      />
+                      <Tooltip 
+                        formatter={(value, name) => [
+                          name === 'revenue' ? `₹${value.toLocaleString()}` : value,
+                          name === 'revenue' ? 'Revenue' : 'Orders'
+                        ]}
+                        labelStyle={{ color: '#374151' }}
+                        contentStyle={{ 
+                          backgroundColor: '#ffffff', 
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#10b981" 
+                        strokeWidth={3}
+                        dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2 }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="orders" 
+                        stroke="#3b82f6" 
+                        strokeWidth={3}
+                        dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                        activeDot={{ r: 6, stroke: '#3b82f6', strokeWidth: 2 }}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
+                  <div className="flex justify-center gap-6 mt-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-sm text-muted-foreground">Revenue</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                      <span className="text-sm text-muted-foreground">Orders</span>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
               {/* Order Status Distribution */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Order Status Distribution</CardTitle>
-                  <CardDescription>Current status of all your orders</CardDescription>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-blue-600" />
+                    Order Status Distribution
+                  </CardTitle>
+                  <CardDescription>Current status breakdown of all your orders</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={orderStatusData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, value }) => `${name}: ${value}`}
-                      >
+                  {orderStatusData.length > 0 ? (
+                    <>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                          <Pie
+                            data={orderStatusData}
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            innerRadius={40}
+                            fill="#8884d8"
+                            dataKey="value"
+                            label={({ name, value, percent }) => 
+                              `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
+                            }
+                            labelLine={false}
+                          >
+                            {orderStatusData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            formatter={(value, name) => [value, 'Orders']}
+                            contentStyle={{ 
+                              backgroundColor: '#ffffff', 
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '8px',
+                              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                            }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="grid grid-cols-2 gap-2 mt-4">
                         {orderStatusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
+                          <div key={index} className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: entry.color }}
+                            ></div>
+                            <span className="text-sm text-muted-foreground capitalize">
+                              {entry.name}: {entry.value}
+                            </span>
+                          </div>
                         ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                      <div className="text-center">
+                        <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>No orders found</p>
+                        <p className="text-sm">Start selling to see order distribution</p>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

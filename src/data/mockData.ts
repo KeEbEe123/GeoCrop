@@ -630,6 +630,108 @@ export const mockOrders: Order[] = [
       pincode: '110001',
       coordinates: { lat: 28.6139, lng: 77.2090 }
     }
+  },
+  // Additional orders for better chart visualization
+  {
+    id: 'ORD004',
+    buyer: 'Arjun Singh',
+    buyerId: '3',
+    seller: 'Ramesh Kumar',
+    sellerId: '1',
+    item: 'Durum Wheat',
+    itemId: '3',
+    quantity: 300,
+    price: 26,
+    totalAmount: 7800,
+    status: 'delivered',
+    type: 'crop',
+    orderDate: '2024-01-10',
+    expectedDelivery: '2024-01-13',
+    actualDelivery: '2024-01-12',
+    paymentMethod: 'online',
+    paymentStatus: 'paid',
+    shippingAddress: {
+      address: '123 Market Street',
+      city: 'New Delhi',
+      state: 'Delhi',
+      pincode: '110001',
+      coordinates: { lat: 28.6139, lng: 77.2090 }
+    },
+    trackingId: 'TRK111222333'
+  },
+  {
+    id: 'ORD005',
+    buyer: 'Priya Sharma',
+    buyerId: '7',
+    seller: 'Ramesh Kumar',
+    sellerId: '1',
+    item: 'Yellow Maize',
+    itemId: '1',
+    quantity: 150,
+    price: 28,
+    totalAmount: 4200,
+    status: 'pending',
+    type: 'crop',
+    orderDate: '2024-01-25',
+    expectedDelivery: '2024-01-28',
+    paymentMethod: 'cod',
+    paymentStatus: 'pending',
+    shippingAddress: {
+      address: '456 Agriculture Lane',
+      city: 'Jaipur',
+      state: 'Rajasthan',
+      pincode: '302001',
+      coordinates: { lat: 26.9124, lng: 75.7873 }
+    }
+  },
+  {
+    id: 'ORD006',
+    buyer: 'Arjun Singh',
+    buyerId: '3',
+    seller: 'Kavita Patel',
+    sellerId: '2',
+    item: 'Cotton',
+    itemId: '6',
+    quantity: 100,
+    price: 65,
+    totalAmount: 6500,
+    status: 'confirmed',
+    type: 'crop',
+    orderDate: '2024-01-23',
+    expectedDelivery: '2024-01-27',
+    paymentMethod: 'bank_transfer',
+    paymentStatus: 'paid',
+    shippingAddress: {
+      address: '123 Market Street',
+      city: 'New Delhi',
+      state: 'Delhi',
+      pincode: '110001',
+      coordinates: { lat: 28.6139, lng: 77.2090 }
+    }
+  },
+  {
+    id: 'ORD007',
+    buyer: 'Priya Sharma',
+    buyerId: '7',
+    seller: 'Kavita Patel',
+    sellerId: '2',
+    item: 'Red Onion',
+    itemId: '2',
+    quantity: 75,
+    price: 35,
+    totalAmount: 2625,
+    status: 'cancelled',
+    type: 'crop',
+    orderDate: '2024-01-18',
+    paymentMethod: 'online',
+    paymentStatus: 'refunded',
+    shippingAddress: {
+      address: '456 Agriculture Lane',
+      city: 'Jaipur',
+      state: 'Rajasthan',
+      pincode: '302001',
+      coordinates: { lat: 26.9124, lng: 75.7873 }
+    }
   }
 ];
 

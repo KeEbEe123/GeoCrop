@@ -27,24 +27,31 @@ const RegisterForm = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate API call delay
-    setTimeout(() => {
-      const success = register(formData.name, formData.email, formData.password, formData.role, formData.location);
+    try {
+      const success = await register(formData.name, formData.email, formData.password, formData.role, formData.location);
+      
       if (success) {
         toast({
-          title: "Welcome to SmartAgri!",
-          description: "Your account has been created successfully.",
+          title: "Welcome to Yield Mentor!",
+          description: "Your account has been created successfully. Check your email for a welcome message!",
         });
         navigate('/');
       } else {
         toast({
           title: "Registration failed",
-          description: "An account with this email already exists.",
+          description: "An account with this email already exists or there was an error creating your account.",
           variant: "destructive",
         });
       }
+    } catch (error) {
+      toast({
+        title: "Registration failed",
+        description: "There was an error creating your account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -54,7 +61,7 @@ const RegisterForm = () => {
           <div className="mx-auto w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center mb-4">
             <Sprout className="w-6 h-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">Join SmartAgri</CardTitle>
+          <CardTitle className="text-2xl">Join Yield Mentor</CardTitle>
           <CardDescription>
             Create your account to get started
           </CardDescription>

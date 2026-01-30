@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Order } from '@/types';
+import { emailServiceClient } from '@/services/emailService';
+import { SupabaseService } from '@/services/supabase';
 import OrderStatusChip from './OrderStatusChip';
 import { 
   CheckCircle, 
@@ -129,6 +131,59 @@ const OrderStatusUpdater: React.FC<OrderStatusUpdaterProps> = ({
       }
 
       await onStatusUpdate(order.id, selectedStatus, updates);
+
+      // Send email notification to buyer about status update
+      if (selectedStatus !== order.status) {
+        if (order.buyerEmail) {
+          emailServiceClient.sendOrderStatusEmail({
+            buyerName: order.buyer,
+            buyerEmail: order.buyerEmail,
+            orderId: order.id,
+            itemName: order.item,
+            quantity: order.quantity,
+            status: selectedStatus,
+            sellerName: order.seller,
+            trackingId: trackingId || undefined,
+            expectedDelivery: expectedDelivery || undefined,
+            totalAmount: order.totalAmount
+          }).then((result) => {
+            if (result.success) {
+              console.log('✅ Order status email sent to buyer:', order.buyerEmail);
+            } else {
+              console.warn('⚠️ Failed to send order status email:', result.message);
+            }
+          }).catch((error) => {
+            console.warn('⚠️ Order status email service error:', error);
+          });
+        } else {
+          // Fallback: fetch buyer email from database if not available in order
+          const buyerUser = await SupabaseService.getUserById(order.buyerId);
+          if (buyerUser?.email) {
+            emailServiceClient.sendOrderStatusEmail({
+              buyerName: order.buyer,
+              buyerEmail: buyerUser.email,
+              orderId: order.id,
+              itemName: order.item,
+              quantity: order.quantity,
+              status: selectedStatus,
+              sellerName: order.seller,
+              trackingId: trackingId || undefined,
+              expectedDelivery: expectedDelivery || undefined,
+              totalAmount: order.totalAmount
+            }).then((result) => {
+              if (result.success) {
+                console.log('✅ Order status email sent to buyer (fallback):', buyerUser.email);
+              } else {
+                console.warn('⚠️ Failed to send order status email:', result.message);
+              }
+            }).catch((error) => {
+              console.warn('⚠️ Order status email service error:', error);
+            });
+          } else {
+            console.warn('⚠️ Could not find buyer email for user ID:', order.buyerId);
+          }
+        }
+      }
 
       toast({
         title: "Order Updated",

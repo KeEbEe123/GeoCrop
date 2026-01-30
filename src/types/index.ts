@@ -82,8 +82,10 @@ export interface Order {
   id: string;
   buyer: string;
   buyerId: string;
+  buyerEmail?: string;
   seller: string;
   sellerId: string;
+  sellerEmail?: string;
   item: string;
   itemId: string;
   quantity: number;

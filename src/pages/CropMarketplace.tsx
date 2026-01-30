@@ -17,6 +17,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCrops } from '@/hooks/useCrops';
 import { useOrders } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
+import { SupabaseService } from '@/services/supabase';
+import { emailServiceClient } from '@/services/emailService';
 import { Crop } from '@/types';
 import { ChevronDown, Edit, Filter, IndianRupee, Leaf, MapPin, Package, Plus, Search, Star, Trash2, Truck, User, X } from 'lucide-react';
 import React, { useState } from 'react';
@@ -151,12 +153,17 @@ const CropMarketplace = () => {
 
     const { crop, quantity } = orderConfirmation;
 
+    // Get seller information to get their email
+    const sellerUser = await SupabaseService.getUserById(crop.farmerId);
+    
     // Create a new order using the hook
     const newOrder = await createOrder({
       buyer: user.name,
       buyerId: user.id,
+      buyerEmail: user.email,
       seller: crop.farmer,
       sellerId: crop.farmerId,
+      sellerEmail: sellerUser?.email,
       item: crop.name,
       itemId: crop.id,
       quantity: quantity,
@@ -182,6 +189,33 @@ const CropMarketplace = () => {
     setOrderConfirmation({ isOpen: false, crop: null, quantity: 0 });
 
     if (newOrder) {
+      // Send new order notification email to seller
+      if (sellerUser?.email) {
+        emailServiceClient.sendNewOrderEmail({
+          sellerName: crop.farmer,
+          sellerEmail: sellerUser.email,
+          orderId: newOrder.id,
+          itemName: crop.name,
+          quantity: quantity,
+          buyerName: user.name,
+          buyerLocation: user.location,
+          totalAmount: newOrder.totalAmount,
+          orderDate: newOrder.orderDate,
+          expectedDelivery: undefined,
+          shippingAddress: newOrder.shippingAddress,
+          paymentMethod: newOrder.paymentMethod,
+          paymentStatus: newOrder.paymentStatus
+        }).then((result) => {
+          if (result.success) {
+            console.log('✅ New order email sent to seller');
+          } else {
+            console.warn('⚠️ Failed to send new order email:', result.message);
+          }
+        }).catch((error) => {
+          console.warn('⚠️ New order email service error:', error);
+        });
+      }
+
       toast({
         title: "Order Placed!",
         description: `Your order for ${crop.name} (${quantity} kg) has been sent to ${crop.farmer}. Total: ₹${newOrder.totalAmount.toLocaleString()}`,
