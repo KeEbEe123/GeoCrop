@@ -11,18 +11,59 @@ class EmailService {
 
   async initialize() {
     try {
+      console.log('🚀 Initializing email service...');
+      console.log('📧 Gmail User:', process.env.GMAIL_USER);
+      console.log('🔑 App Password configured:', !!process.env.GMAIL_APP_PASSWORD);
+      
       this.transporter = createTransporter();
-      this.isReady = await verifyTransporter(this.transporter);
-      return this.isReady;
+      
+      // In production, try to verify but don't fail if it doesn't work immediately
+      if (process.env.NODE_ENV === 'production') {
+        console.log('🏭 Production mode: Attempting SMTP verification with timeout...');
+        
+        // Set a timeout for verification in production
+        const verificationPromise = verifyTransporter(this.transporter);
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Verification timeout')), 10000)
+        );
+        
+        try {
+          this.isReady = await Promise.race([verificationPromise, timeoutPromise]);
+        } catch (error) {
+          console.warn('⚠️  SMTP verification failed or timed out:', error.message);
+          console.warn('⚠️  Service will continue and retry on first email send');
+          this.isReady = false;
+        }
+      } else {
+        this.isReady = await verifyTransporter(this.transporter);
+      }
+      
+      return true; // Always return true in production to allow service to start
     } catch (error) {
       console.error('Failed to initialize email service:', error);
       this.isReady = false;
-      return false;
+      return process.env.NODE_ENV === 'production'; // Allow service to start in production
     }
   }
 
   async sendWelcomeEmail(userData) {
+    // Try to reinitialize if not ready (with retry logic)
     if (!this.isReady) {
+      console.log('📧 Email service not ready, attempting to reinitialize...');
+      for (let i = 0; i < 3; i++) {
+        try {
+          this.transporter = createTransporter();
+          this.isReady = await verifyTransporter(this.transporter);
+          if (this.isReady) break;
+        } catch (error) {
+          console.warn(`⚠️  Retry ${i + 1}/3 failed:`, error.message);
+          if (i < 2) await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+        }
+      }
+    }
+
+    // In production, try to send even if verification failed
+    if (!this.isReady && process.env.NODE_ENV !== 'production') {
       throw new Error('Email service is not ready. Please check SMTP configuration.');
     }
 
@@ -44,7 +85,15 @@ class EmailService {
         }
       };
 
+      // Ensure we have a transporter
+      if (!this.transporter) {
+        this.transporter = createTransporter();
+      }
+
       const result = await this.transporter.sendMail(mailOptions);
+      
+      // Mark as ready if send was successful
+      this.isReady = true;
       
       console.log('✅ Welcome email sent successfully:', {
         messageId: result.messageId,

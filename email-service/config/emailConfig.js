@@ -5,7 +5,7 @@ dotenv.config();
 
 // Create Gmail SMTP transporter
 export const createTransporter = () => {
-  return nodemailer.createTransport({
+  const config = {
     service: 'gmail',
     host: 'smtp.gmail.com',
     port: 587,
@@ -17,17 +17,35 @@ export const createTransporter = () => {
     tls: {
       rejectUnauthorized: false
     }
-  });
+  };
+
+  // Add additional timeout settings for production
+  if (process.env.NODE_ENV === 'production') {
+    config.connectionTimeout = 60000; // 60 seconds
+    config.greetingTimeout = 30000; // 30 seconds
+    config.socketTimeout = 60000; // 60 seconds
+  }
+
+  return nodemailer.createTransport(config);
 };
 
 // Verify transporter configuration
 export const verifyTransporter = async (transporter) => {
   try {
+    console.log('🔍 Verifying SMTP connection...');
     await transporter.verify();
     console.log('✅ SMTP server is ready to send emails');
     return true;
   } catch (error) {
     console.error('❌ SMTP server verification failed:', error.message);
+    
+    // In production, don't fail completely - allow service to start
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('⚠️  Continuing in production mode without SMTP verification');
+      console.warn('⚠️  Emails may fail until SMTP connection is established');
+      return false;
+    }
+    
     return false;
   }
 };
