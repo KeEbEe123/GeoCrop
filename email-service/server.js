@@ -3,123 +3,86 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+
 import emailRoutes from './routes/emailRoutes.js';
 import emailService from './services/emailService.js';
 
-// Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Security middleware
+/* ============================================================
+   ✅ CORS — MUST BE FIRST
+   ============================================================ */
+
+const corsOptions = {
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://geo-crop.vercel.app'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // ✅ PRE-FLIGHT FIX
+
+/* ============================================================
+   Security & Parsing
+   ============================================================ */
+
 app.use(helmet());
 
-// CORS configuration
-const allowedOrigins = [
-  'http://localhost:5173', // Vite dev server
-  'http://localhost:3000', // React dev server
-  'http://localhost:8080', // Alternative React dev server
-  'http://localhost:5000', // Flask dev server
-  process.env.APP_URL || 'http://localhost:5173'
-];
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Add production URLs if they exist
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
+/* ============================================================
+   Debug Logging (safe to keep for now)
+   ============================================================ */
 
-// For production, allow common deployment platforms
-if (process.env.NODE_ENV === 'production') {
-  allowedOrigins.push(
-    /https:\/\/.*\.vercel\.app$/,
-    /https:\/\/.*\.netlify\.app$/,
-    /https:\/\/.*\.onrender\.com$/,
-    /https:\/\/.*\.herokuapp\.com$/
+app.use((req, res, next) => {
+  console.log(
+    `${new Date().toISOString()} | ${req.method} ${req.originalUrl} | Origin: ${req.headers.origin}`
   );
-}
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list or matches pattern
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
-      if (typeof allowedOrigin === 'string') {
-        return allowedOrigin === origin;
-      } else if (allowedOrigin instanceof RegExp) {
-        return allowedOrigin.test(origin);
-      }
-      return false;
-    });
-    
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      console.warn(`CORS blocked origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  }
+  next();
 });
-app.use(limiter);
 
-// Email-specific rate limiting
+/* ============================================================
+   Rate Limiting
+   ============================================================ */
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use(globalLimiter);
+
+// ❗ Apply email limiter ONLY to POST routes (NOT OPTIONS)
 const emailLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10, // limit each IP to 10 email requests per minute
+  windowMs: 60 * 1000,
+  max: 10,
   message: {
     success: false,
     message: 'Too many email requests, please try again later.'
   }
 });
 
-// Body parser middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.post('/api/email/send-welcome', emailLimiter);
+app.post('/api/email/send-email', emailLimiter);
+app.post('/api/email/test', emailLimiter);
 
-// Add request logging middleware for debugging
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
-  console.log('Headers:', req.headers);
-  console.log('Origin:', req.get('origin'));
-  next();
-});
+/* ============================================================
+   Routes
+   ============================================================ */
 
-// Add response headers for better debugging
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-API-Key');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  next();
-});
-
-// Apply email rate limiting to email routes
-app.use('/api/email', emailLimiter);
-
-// Routes
 app.use('/api/email', emailRoutes);
 
-// Handle preflight requests
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.get('origin'));
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-API-Key');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.sendStatus(200);
-});
-
-// Root endpoint
 app.get('/', (req, res) => {
   res.json({
     success: true,
@@ -135,9 +98,13 @@ app.get('/', (req, res) => {
   });
 });
 
-// Error handling middleware
+/* ============================================================
+   Error Handling
+   ============================================================ */
+
 app.use((error, req, res, next) => {
-  console.error('Server error:', error);
+  console.error('❌ Server error:', error);
+
   res.status(500).json({
     success: false,
     message: 'Internal server error',
@@ -145,7 +112,6 @@ app.use((error, req, res, next) => {
   });
 });
 
-// 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -153,52 +119,32 @@ app.use('*', (req, res) => {
   });
 });
 
-// Initialize email service and start server
+/* ============================================================
+   Server Startup
+   ============================================================ */
+
 async function startServer() {
   try {
     console.log('🚀 Starting Yield Mentor Email Service...');
-    
-    // Initialize email service
+
     const emailInitialized = await emailService.initialize();
-    
+
     if (!emailInitialized) {
-      console.warn('⚠️  Email service initialization failed, but server will continue running');
-      console.warn('⚠️  Please check your Gmail SMTP configuration in .env file');
+      console.warn('⚠️ Email service failed to initialize');
     }
-    
-    // Start server
+
     app.listen(PORT, () => {
-      console.log(`✅ Email service running on port ${PORT}`);
-      console.log(`📧 Gmail SMTP: ${emailInitialized ? 'Connected' : 'Not Connected'}`);
-      console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📍 Health check: http://localhost:${PORT}/api/email/health`);
-      
-      if (process.env.NODE_ENV === 'development') {
-        console.log('\n📋 Available endpoints:');
-        console.log(`   GET  http://localhost:${PORT}/`);
-        console.log(`   GET  http://localhost:${PORT}/api/email/health`);
-        console.log(`   POST http://localhost:${PORT}/api/email/send-welcome`);
-        console.log(`   POST http://localhost:${PORT}/api/email/send-email`);
-        console.log(`   POST http://localhost:${PORT}/api/email/test`);
-        console.log('\n🔑 Don\'t forget to set your API key in requests!');
-      }
+      console.log(`✅ Server running on port ${PORT}`);
+      console.log(`📧 Email status: ${emailInitialized ? 'Connected' : 'Not connected'}`);
+      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
+  } catch (err) {
+    console.error('❌ Startup failure:', err);
     process.exit(1);
   }
 }
 
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('📴 Received SIGTERM, shutting down gracefully...');
-  process.exit(0);
-});
+process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', () => process.exit(0));
 
-process.on('SIGINT', () => {
-  console.log('📴 Received SIGINT, shutting down gracefully...');
-  process.exit(0);
-});
-
-// Start the server
 startServer();
