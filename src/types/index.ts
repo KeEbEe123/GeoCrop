@@ -46,6 +46,7 @@ export interface Crop {
   };
   reviews: Review[];
   averageRating: number;
+  totalRatings?: number;
   totalSold: number;
   featured: boolean;
 }
@@ -83,6 +84,8 @@ export interface Order {
   buyer: string;
   buyerId: string;
   buyerEmail?: string;
+  buyerRating?: number;
+  buyerTotalRatings?: number;
   seller: string;
   sellerId: string;
   sellerEmail?: string;

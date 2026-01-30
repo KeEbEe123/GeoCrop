@@ -16,14 +16,51 @@ const PORT = process.env.PORT || 3001;
 app.use(helmet());
 
 // CORS configuration
+const allowedOrigins = [
+  'http://localhost:5173', // Vite dev server
+  'http://localhost:3000', // React dev server
+  'http://localhost:8080', // Alternative React dev server
+  'http://localhost:5000', // Flask dev server
+  process.env.APP_URL || 'http://localhost:5173'
+];
+
+// Add production URLs if they exist
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
+// For production, allow common deployment platforms
+if (process.env.NODE_ENV === 'production') {
+  allowedOrigins.push(
+    /https:\/\/.*\.vercel\.app$/,
+    /https:\/\/.*\.netlify\.app$/,
+    /https:\/\/.*\.onrender\.com$/,
+    /https:\/\/.*\.herokuapp\.com$/
+  );
+}
+
 app.use(cors({
-  origin: [
-    'http://localhost:5173', // Vite dev server
-    'http://localhost:3000', // React dev server
-    'http://localhost:8080', // Alternative React dev server
-    'http://localhost:5000', // Flask dev server
-    process.env.APP_URL || 'http://localhost:5173'
-  ],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is in allowed list or matches pattern
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 
@@ -52,11 +89,35 @@ const emailLimiter = rateLimit({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Add request logging middleware for debugging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('Headers:', req.headers);
+  console.log('Origin:', req.get('origin'));
+  next();
+});
+
+// Add response headers for better debugging
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-API-Key');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  next();
+});
+
 // Apply email rate limiting to email routes
 app.use('/api/email', emailLimiter);
 
 // Routes
 app.use('/api/email', emailRoutes);
+
+// Handle preflight requests
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.get('origin'));
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-API-Key');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
 
 // Root endpoint
 app.get('/', (req, res) => {

@@ -375,35 +375,82 @@ const OrderManagement = () => {
                   </div>
                   
                   <div>
-                    <h4 className="font-semibold mb-2">Delivery Information</h4>
+                    <h4 className="font-semibold mb-2">
+                      {user.role === 'farmer' ? 'Buyer Information' : 'Seller Information'}
+                    </h4>
                     <div className="space-y-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Address:</span>
-                        <div className="mt-1">
-                          {selectedOrder.shippingAddress.address}<br/>
-                          {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state}<br/>
-                          {selectedOrder.shippingAddress.pincode}
-                        </div>
+                      <div className="flex justify-between">
+                        <span>Name:</span>
+                        <span className="font-medium">
+                          {user.role === 'farmer' ? selectedOrder.buyer : selectedOrder.seller}
+                        </span>
                       </div>
-                      {selectedOrder.expectedDelivery && (
-                        <div className="flex justify-between">
-                          <span>Expected Delivery:</span>
-                          <span>{new Date(selectedOrder.expectedDelivery).toLocaleDateString()}</span>
+                      {user.role === 'farmer' && selectedOrder.buyerRating !== undefined && selectedOrder.buyerRating > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span>Buyer Rating:</span>
+                          <div className="flex items-center gap-1">
+                            <div className="flex">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star
+                                  key={star}
+                                  className={`w-4 h-4 ${
+                                    star <= (selectedOrder.buyerRating || 0)
+                                      ? 'text-yellow-400 fill-current'
+                                      : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="ml-1 font-medium">
+                              {selectedOrder.buyerRating?.toFixed(1)}
+                            </span>
+                            {selectedOrder.buyerTotalRatings && selectedOrder.buyerTotalRatings > 0 && (
+                              <span className="text-muted-foreground">
+                                ({selectedOrder.buyerTotalRatings} reviews)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )}
-                      {selectedOrder.actualDelivery && (
+                      {user.role === 'farmer' && (!selectedOrder.buyerRating || selectedOrder.buyerRating === 0) && (
                         <div className="flex justify-between">
-                          <span>Delivered On:</span>
-                          <span>{new Date(selectedOrder.actualDelivery).toLocaleDateString()}</span>
-                        </div>
-                      )}
-                      {selectedOrder.trackingId && (
-                        <div className="flex justify-between">
-                          <span>Tracking ID:</span>
-                          <span className="font-mono">{selectedOrder.trackingId}</span>
+                          <span>Buyer Rating:</span>
+                          <span className="text-muted-foreground">No ratings yet</span>
                         </div>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-2">Delivery Information</h4>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Address:</span>
+                      <div className="mt-1">
+                        {selectedOrder.shippingAddress.address}<br/>
+                        {selectedOrder.shippingAddress.city}, {selectedOrder.shippingAddress.state}<br/>
+                        {selectedOrder.shippingAddress.pincode}
+                      </div>
+                    </div>
+                    {selectedOrder.expectedDelivery && (
+                      <div className="flex justify-between">
+                        <span>Expected Delivery:</span>
+                        <span>{new Date(selectedOrder.expectedDelivery).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {selectedOrder.actualDelivery && (
+                      <div className="flex justify-between">
+                        <span>Delivered On:</span>
+                        <span>{new Date(selectedOrder.actualDelivery).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {selectedOrder.trackingId && (
+                      <div className="flex justify-between">
+                        <span>Tracking ID:</span>
+                        <span className="font-mono">{selectedOrder.trackingId}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -30,6 +30,7 @@ const mapDbRowToCrop = (row: any): Crop => {
     coordinates: row.coordinates,
     reviews: [], // Will be populated separately if needed
     averageRating: parseFloat(row.average_rating) || 0,
+    totalRatings: row.total_ratings || 0,
     totalSold: row.total_sold || 0,
     featured: row.featured || false
   };
@@ -60,6 +61,8 @@ const mapDbRowToOrder = (row: any): Order => {
     buyer: row.buyer_name || 'Unknown Buyer',
     buyerId: row.buyer_id,
     buyerEmail: row.buyer_email,
+    buyerRating: row.buyer_rating,
+    buyerTotalRatings: row.buyer_total_ratings,
     seller: row.seller_name || 'Unknown Seller',
     sellerId: row.seller_id,
     sellerEmail: row.seller_email,
@@ -100,10 +103,44 @@ export class SupabaseService {
         throw error;
       }
 
-      return data.map(row => mapDbRowToCrop({
-        ...row,
-        farmer_name: row.users?.name
-      }));
+      // Get ratings for all crops
+      const cropIds = data.map(crop => crop.id);
+      const { data: ratingsData } = await supabase
+        .from('ratings')
+        .select('rated_entity_id, rating')
+        .eq('rated_entity_type', 'crop')
+        .in('rated_entity_id', cropIds);
+
+      // Calculate average ratings for each crop
+      const ratingsMap = new Map<string, { average: number; count: number }>();
+      
+      if (ratingsData) {
+        const ratingsByEntity = ratingsData.reduce((acc, rating) => {
+          if (!acc[rating.rated_entity_id]) {
+            acc[rating.rated_entity_id] = [];
+          }
+          acc[rating.rated_entity_id].push(rating.rating);
+          return acc;
+        }, {} as Record<string, number[]>);
+
+        Object.entries(ratingsByEntity).forEach(([entityId, ratings]) => {
+          const average = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+          ratingsMap.set(entityId, { 
+            average: Math.round(average * 10) / 10, 
+            count: ratings.length 
+          });
+        });
+      }
+
+      return data.map(row => {
+        const ratingInfo = ratingsMap.get(row.id) || { average: 0, count: 0 };
+        return mapDbRowToCrop({
+          ...row,
+          farmer_name: row.users?.name,
+          average_rating: ratingInfo.average,
+          total_ratings: ratingInfo.count
+        });
+      });
     } catch (error) {
       console.error('Error fetching crops:', error);
       return [];
@@ -125,10 +162,44 @@ export class SupabaseService {
         throw error;
       }
 
-      return data.map(row => mapDbRowToCrop({
-        ...row,
-        farmer_name: row.users?.name
-      }));
+      // Get ratings for all crops
+      const cropIds = data.map(crop => crop.id);
+      const { data: ratingsData } = await supabase
+        .from('ratings')
+        .select('rated_entity_id, rating')
+        .eq('rated_entity_type', 'crop')
+        .in('rated_entity_id', cropIds);
+
+      // Calculate average ratings for each crop
+      const ratingsMap = new Map<string, { average: number; count: number }>();
+      
+      if (ratingsData) {
+        const ratingsByEntity = ratingsData.reduce((acc, rating) => {
+          if (!acc[rating.rated_entity_id]) {
+            acc[rating.rated_entity_id] = [];
+          }
+          acc[rating.rated_entity_id].push(rating.rating);
+          return acc;
+        }, {} as Record<string, number[]>);
+
+        Object.entries(ratingsByEntity).forEach(([entityId, ratings]) => {
+          const average = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+          ratingsMap.set(entityId, { 
+            average: Math.round(average * 10) / 10, 
+            count: ratings.length 
+          });
+        });
+      }
+
+      return data.map(row => {
+        const ratingInfo = ratingsMap.get(row.id) || { average: 0, count: 0 };
+        return mapDbRowToCrop({
+          ...row,
+          farmer_name: row.users?.name,
+          average_rating: ratingInfo.average,
+          total_ratings: ratingInfo.count
+        });
+      });
     } catch (error) {
       console.error('Error fetching farmer crops:', error);
       return [];
@@ -380,6 +451,35 @@ export class SupabaseService {
         userMap.set(user.id, { name: user.name, email: user.email });
       });
 
+      // Get buyer ratings
+      const buyerIds = [...new Set(ordersData.map(order => order.buyer_id))];
+      const { data: buyerRatingsData } = await supabase
+        .from('ratings')
+        .select('rated_entity_id, rating')
+        .eq('rated_entity_type', 'user')
+        .in('rated_entity_id', buyerIds);
+
+      // Calculate average ratings for buyers
+      const buyerRatingsMap = new Map<string, { average: number; count: number }>();
+      
+      if (buyerRatingsData) {
+        const ratingsByBuyer = buyerRatingsData.reduce((acc, rating) => {
+          if (!acc[rating.rated_entity_id]) {
+            acc[rating.rated_entity_id] = [];
+          }
+          acc[rating.rated_entity_id].push(rating.rating);
+          return acc;
+        }, {} as Record<string, number[]>);
+
+        Object.entries(ratingsByBuyer).forEach(([buyerId, ratings]) => {
+          const average = ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length;
+          buyerRatingsMap.set(buyerId, { 
+            average: Math.round(average * 10) / 10, 
+            count: ratings.length 
+          });
+        });
+      }
+
       // Get crop/product names
       const cropIds = ordersData.filter(o => o.item_type === 'crop').map(o => o.item_id);
       const productIds = ordersData.filter(o => o.item_type === 'product').map(o => o.item_id);
@@ -409,15 +509,20 @@ export class SupabaseService {
         });
       }
 
-      // Map the data to Order objects with names and emails
-      const mappedOrders = ordersData.map(row => mapDbRowToOrder({
-        ...row,
-        buyer_name: userMap.get(row.buyer_id)?.name,
-        buyer_email: userMap.get(row.buyer_id)?.email,
-        seller_name: userMap.get(row.seller_id)?.name,
-        seller_email: userMap.get(row.seller_id)?.email,
-        item_name: row.item_type === 'crop' ? cropMap.get(row.item_id) : productMap.get(row.item_id)
-      }));
+      // Map the data to Order objects with names, emails, and buyer ratings
+      const mappedOrders = ordersData.map(row => {
+        const buyerRatingInfo = buyerRatingsMap.get(row.buyer_id) || { average: 0, count: 0 };
+        return mapDbRowToOrder({
+          ...row,
+          buyer_name: userMap.get(row.buyer_id)?.name,
+          buyer_email: userMap.get(row.buyer_id)?.email,
+          buyer_rating: buyerRatingInfo.average,
+          buyer_total_ratings: buyerRatingInfo.count,
+          seller_name: userMap.get(row.seller_id)?.name,
+          seller_email: userMap.get(row.seller_id)?.email,
+          item_name: row.item_type === 'crop' ? cropMap.get(row.item_id) : productMap.get(row.item_id)
+        });
+      });
 
       console.log('Mapped orders:', mappedOrders);
       return mappedOrders;

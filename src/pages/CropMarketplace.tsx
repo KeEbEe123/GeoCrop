@@ -539,7 +539,7 @@ const CropMarketplace = () => {
                       <div className="flex items-center gap-2 mb-2">
                         <RatingDisplay rating={crop.averageRating} size="sm" />
                         <span className="text-sm text-muted-foreground">
-                          ({crop.reviews.length} reviews)
+                          ({crop.totalRatings || 0} reviews)
                         </span>
                       </div>
                     </div>
