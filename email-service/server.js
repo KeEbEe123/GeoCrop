@@ -12,9 +12,6 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Ensure we bind to 0.0.0.0 for Render
-const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
-
 // Security middleware
 app.use(helmet());
 
@@ -113,6 +110,15 @@ app.use('/api/email', emailLimiter);
 // Routes
 app.use('/api/email', emailRoutes);
 
+// Handle preflight requests
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.get('origin'));
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, X-API-Key');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
+
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
@@ -161,19 +167,19 @@ async function startServer() {
     }
     
     // Start server
-    app.listen(PORT, HOST, () => {
-      console.log(`✅ Email service running on ${HOST}:${PORT}`);
+    app.listen(PORT, () => {
+      console.log(`✅ Email service running on port ${PORT}`);
       console.log(`📧 Gmail SMTP: ${emailInitialized ? 'Connected' : 'Not Connected'}`);
       console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📍 Health check: http://${HOST}:${PORT}/api/email/health`);
+      console.log(`📍 Health check: http://localhost:${PORT}/api/email/health`);
       
       if (process.env.NODE_ENV === 'development') {
         console.log('\n📋 Available endpoints:');
-        console.log(`   GET  http://${HOST}:${PORT}/`);
-        console.log(`   GET  http://${HOST}:${PORT}/api/email/health`);
-        console.log(`   POST http://${HOST}:${PORT}/api/email/send-welcome`);
-        console.log(`   POST http://${HOST}:${PORT}/api/email/send-email`);
-        console.log(`   POST http://${HOST}:${PORT}/api/email/test`);
+        console.log(`   GET  http://localhost:${PORT}/`);
+        console.log(`   GET  http://localhost:${PORT}/api/email/health`);
+        console.log(`   POST http://localhost:${PORT}/api/email/send-welcome`);
+        console.log(`   POST http://localhost:${PORT}/api/email/send-email`);
+        console.log(`   POST http://localhost:${PORT}/api/email/test`);
         console.log('\n🔑 Don\'t forget to set your API key in requests!');
       }
     });
