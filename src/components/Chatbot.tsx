@@ -29,7 +29,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onToggle }) => {
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -43,9 +42,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onToggle }) => {
 
   const callGeminiAPI = async (userMessage: string): Promise<string> => {
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyDRHcB7kFH_W04WT9Ck16Zh-l5Un6sxNAE';
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+      if (!apiKey) {
+        throw new Error('Gemini API key not configured');
+      }
+      
+      // Try gemini-1.5-flash first (more widely available)
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,13 +90,17 @@ User question: ${userMessage}`
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Gemini API Error Response:', errorText);
+        throw new Error(`API request failed: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
       
       if (data.candidates && data.candidates[0] && data.candidates[0].content) {
         return data.candidates[0].content.parts[0].text;
+      } else if (data.error) {
+        throw new Error(`Gemini API Error: ${data.error.message}`);
       } else {
         throw new Error('Invalid response format from Gemini API');
       }
@@ -147,7 +155,7 @@ User question: ${userMessage}`
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -235,7 +243,7 @@ User question: ${userMessage}`
             <Input
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               placeholder="Ask me about farming, crops, or agriculture..."
               disabled={isLoading}
               className="flex-1"
@@ -249,7 +257,7 @@ User question: ${userMessage}`
             </Button>
           </div>
           <div className="text-xs text-muted-foreground mt-2 text-center">
-            Powered by Gemini 2.0 Flash
+            Powered by Gemini 1.5 Flash
           </div>
         </div>
       </CardContent>
