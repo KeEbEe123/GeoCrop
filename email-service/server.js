@@ -167,13 +167,17 @@ async function startServer() {
     }
     
     // Start server
-    app.listen(PORT, () => {
-      console.log(`✅ Email service running on port ${PORT}`);
+    const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
+    app.listen(PORT, HOST, () => {
+      console.log(`✅ Email service running on ${HOST}:${PORT}`);
       console.log(`📧 Gmail SMTP: ${emailInitialized ? 'Connected' : 'Not Connected'}`);
       console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`📍 Health check: http://localhost:${PORT}/api/email/health`);
       
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === 'production') {
+        console.log(`� Health check: http://${HOST}:${PORT}/api/email/health`);
+        console.log('🚀 Production mode: Service ready for external requests');
+      } else {
+        console.log(`📍 Health check: http://localhost:${PORT}/api/email/health`);
         console.log('\n📋 Available endpoints:');
         console.log(`   GET  http://localhost:${PORT}/`);
         console.log(`   GET  http://localhost:${PORT}/api/email/health`);

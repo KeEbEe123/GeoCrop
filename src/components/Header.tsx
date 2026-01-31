@@ -41,8 +41,9 @@ const Header = () => {
       case 'seller':
         return [
           ...baseItems,
-          { path: '/products', label: 'Sell Products', icon: TrendingUp },
-          { path: '/orders', label: 'Sales', icon: Package },
+          { path: '/seller-dashboard', label: 'Dashboard', icon: BarChart3 },
+          { path: '/products', label: 'Manage Products', icon: TrendingUp },
+          { path: '/orders', label: 'Orders', icon: Package },
         ];
       default:
         return baseItems;

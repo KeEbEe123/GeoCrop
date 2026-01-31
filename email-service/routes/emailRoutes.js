@@ -4,15 +4,56 @@ import { authenticateApiKey, validateEmailData } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Health check endpoint
-router.get('/health', (req, res) => {
-  const status = emailService.getStatus();
-  res.json({
-    success: true,
-    message: 'Email service is running',
-    status: status,
-    timestamp: new Date().toISOString()
-  });
+// Health check endpoint with SMTP connectivity test
+router.get('/health', async (req, res) => {
+  try {
+    const status = emailService.getStatus();
+    
+    // Add detailed health information
+    const healthInfo = {
+      success: true,
+      message: 'Email service is running',
+      status: status,
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      version: '1.0.0',
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      smtp: {
+        configured: !!process.env.GMAIL_USER && !!process.env.GMAIL_APP_PASSWORD,
+        user: process.env.GMAIL_USER ? process.env.GMAIL_USER.replace(/(.{3}).*(@.*)/, '$1***$2') : 'Not configured',
+        ready: status.isReady
+      }
+    };
+
+    // If requested, test SMTP connection (optional query parameter)
+    if (req.query.testSmtp === 'true') {
+      try {
+        console.log('🔍 Health check: Testing SMTP connection...');
+        const testResult = await emailService.testConnection();
+        healthInfo.smtp.connectionTest = {
+          success: testResult,
+          testedAt: new Date().toISOString()
+        };
+      } catch (error) {
+        healthInfo.smtp.connectionTest = {
+          success: false,
+          error: error.message,
+          testedAt: new Date().toISOString()
+        };
+      }
+    }
+
+    res.json(healthInfo);
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Health check failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Send welcome email endpoint

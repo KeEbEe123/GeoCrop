@@ -54,6 +54,37 @@ const mapDbRowToUser = (row: any): User => {
   };
 };
 
+// Helper function to convert database row to Product interface
+const mapDbRowToProduct = (row: any): Product => {
+  return {
+    id: row.id,
+    name: row.name,
+    seller: row.seller_name || 'Unknown Seller',
+    sellerId: row.seller_id,
+    category: row.category as 'seeds' | 'fertilizers' | 'pesticides' | 'tools' | 'equipment',
+    price: parseFloat(row.price),
+    stock: row.stock,
+    description: row.description,
+    images: row.images || [],
+    specifications: row.specifications,
+    brand: row.brand,
+    manufacturingDate: row.manufacturing_date,
+    expiryDate: row.expiry_date,
+    isOrganic: row.is_organic,
+    certifications: row.certifications || [],
+    minOrderQuantity: row.min_order_quantity,
+    weight: parseFloat(row.weight),
+    unit: row.unit as 'kg' | 'gm' | 'liter' | 'piece',
+    reviews: [], // Will be populated separately if needed
+    averageRating: parseFloat(row.average_rating) || 0,
+    featured: row.featured || false,
+    discount: row.discount_percentage > 0 ? {
+      percentage: row.discount_percentage,
+      validTill: row.discount_valid_till
+    } : undefined
+  };
+};
+
 // Helper function to convert database row to Order interface
 const mapDbRowToOrder = (row: any): Order => {
   return {
@@ -556,18 +587,164 @@ export class SupabaseService {
     }
   }
 
-  // Debug method to get all orders
-  static async getAllOrdersDebug(): Promise<any[]> {
+  // Update the ratings table to support products
+  static async updateRatingsForProduct(productId: string): Promise<void> {
+    try {
+      // Get all ratings for this product
+      const { data: ratingsData } = await supabase
+        .from('ratings')
+        .select('rating')
+        .eq('rated_entity_type', 'product')
+        .eq('rated_entity_id', productId);
+
+      if (ratingsData && ratingsData.length > 0) {
+        const average = ratingsData.reduce((sum, rating) => sum + rating.rating, 0) / ratingsData.length;
+        
+        // Update the product's average rating
+        await supabase
+          .from('products')
+          .update({ average_rating: Math.round(average * 10) / 10 })
+          .eq('id', productId);
+      }
+    } catch (error) {
+      console.error('Error updating product ratings:', error);
+    }
+  }
+
+  // Product-related methods
+  static async getAllProducts(): Promise<Product[]> {
     try {
       const { data, error } = await supabase
-        .from('orders')
-        .select('*');
+        .from('products')
+        .select(`
+          *,
+          users!products_seller_id_fkey(name)
+        `)
+        .gt('stock', 0)
+        .order('featured', { ascending: false })
+        .order('created_at', { ascending: false });
 
-      console.log('All orders in database:', { data, error });
-      return data || [];
+      if (error) {
+        throw error;
+      }
+
+      return data.map(row => mapDbRowToProduct({
+        ...row,
+        seller_name: row.users?.name
+      }));
     } catch (error) {
-      console.error('Error fetching all orders:', error);
+      console.error('Error fetching products:', error);
       return [];
+    }
+  }
+
+  static async getProductsBySellerId(sellerId: string): Promise<Product[]> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          users!products_seller_id_fkey(name)
+        `)
+        .eq('seller_id', sellerId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data.map(row => mapDbRowToProduct({
+        ...row,
+        seller_name: row.users?.name
+      }));
+    } catch (error) {
+      console.error('Error fetching seller products:', error);
+      return [];
+    }
+  }
+
+  static async createProduct(product: Omit<Product, 'id' | 'reviews' | 'averageRating'>): Promise<Product | null> {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .insert({
+          name: product.name,
+          seller_id: product.sellerId,
+          category: product.category,
+          price: product.price,
+          stock: product.stock,
+          description: product.description,
+          images: product.images,
+          specifications: product.specifications,
+          brand: product.brand,
+          manufacturing_date: product.manufacturingDate,
+          expiry_date: product.expiryDate,
+          is_organic: product.isOrganic,
+          certifications: product.certifications,
+          min_order_quantity: product.minOrderQuantity,
+          weight: product.weight,
+          unit: product.unit,
+          featured: product.featured,
+          discount_percentage: product.discount?.percentage || 0,
+          discount_valid_till: product.discount?.validTill
+        })
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return mapDbRowToProduct({ ...data, seller_name: product.seller });
+    } catch (error) {
+      console.error('Error creating product:', error);
+      return null;
+    }
+  }
+
+  static async updateProduct(productId: string, updates: Partial<Product>): Promise<boolean> {
+    try {
+      const updateData: any = {};
+      
+      if (updates.name !== undefined) updateData.name = updates.name;
+      if (updates.stock !== undefined) updateData.stock = updates.stock;
+      if (updates.price !== undefined) updateData.price = updates.price;
+      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.images !== undefined) updateData.images = updates.images;
+      if (updates.specifications !== undefined) updateData.specifications = updates.specifications;
+      if (updates.brand !== undefined) updateData.brand = updates.brand;
+      if (updates.weight !== undefined) updateData.weight = updates.weight;
+      if (updates.unit !== undefined) updateData.unit = updates.unit;
+      if (updates.minOrderQuantity !== undefined) updateData.min_order_quantity = updates.minOrderQuantity;
+      if (updates.featured !== undefined) updateData.featured = updates.featured;
+      if (updates.discount !== undefined) {
+        updateData.discount_percentage = updates.discount?.percentage || 0;
+        updateData.discount_valid_till = updates.discount?.validTill;
+      }
+
+      const { error } = await supabase
+        .from('products')
+        .update(updateData)
+        .eq('id', productId);
+
+      return !error;
+    } catch (error) {
+      console.error('Error updating product:', error);
+      return false;
+    }
+  }
+
+  static async deleteProduct(productId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      return !error;
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      return false;
     }
   }
 }

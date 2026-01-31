@@ -4,7 +4,7 @@ export interface Rating {
   id: string;
   orderId: string;
   raterId: string;
-  ratedEntityType: 'crop' | 'user';
+  ratedEntityType: 'crop' | 'user' | 'product';
   ratedEntityId: string;
   rating: number;
   comment?: string;
@@ -15,7 +15,7 @@ export interface Rating {
 export interface CreateRatingData {
   orderId: string;
   raterId: string;
-  ratedEntityType: 'crop' | 'user';
+  ratedEntityType: 'crop' | 'user' | 'product';
   ratedEntityId: string;
   rating: number;
   comment?: string;
@@ -104,9 +104,9 @@ export class RatingService {
   }
 
   /**
-   * Get ratings for a specific entity (crop or user)
+   * Get ratings for a specific entity (crop, user, or product)
    */
-  static async getRatingsByEntity(entityType: 'crop' | 'user', entityId: string): Promise<Rating[]> {
+  static async getRatingsByEntity(entityType: 'crop' | 'user' | 'product', entityId: string): Promise<Rating[]> {
     try {
       const { data, error } = await supabase
         .from('ratings')
@@ -136,7 +136,7 @@ export class RatingService {
   /**
    * Get average rating for an entity
    */
-  static async getAverageRating(entityType: 'crop' | 'user', entityId: string): Promise<{ average: number; count: number }> {
+  static async getAverageRating(entityType: 'crop' | 'user' | 'product', entityId: string): Promise<{ average: number; count: number }> {
     try {
       const { data, error } = await supabase
         .from('ratings')

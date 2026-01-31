@@ -7,20 +7,24 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { mockProducts, mockOrders } from '@/data/mockData';
+import { useProducts } from '@/hooks/useProducts';
+import { useOrders } from '@/hooks/useOrders';
 import { Product } from '@/types';
-import { Search, Store, Package, IndianRupee, Truck, Plus, Edit, Trash2 } from 'lucide-react';
+import { Search, Store, Package, IndianRupee, Truck, Plus, Edit, Trash2, Calendar, Weight } from 'lucide-react';
 import AddProductForm from '@/components/forms/AddProductForm';
+import EditProductForm from '@/components/forms/EditProductForm';
 import ImageGallery from '@/components/ImageGallery';
 import OrderConfirmationDialog from '@/components/OrderConfirmationDialog';
 
 const ProductMarketplace = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { products, loading, addProduct, updateProduct, deleteProduct } = useProducts();
+  const { createOrder } = useOrders();
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [filteredProducts, setFilteredProducts] = useState(mockProducts);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [orderConfirmation, setOrderConfirmation] = useState<{
     isOpen: boolean;
     product: Product | null;
@@ -28,27 +32,17 @@ const ProductMarketplace = () => {
   }>({ isOpen: false, product: null, quantity: 0 });
   const [orderQuantities, setOrderQuantities] = useState<Record<string, number>>({});
 
-  React.useEffect(() => {
-    let filtered = mockProducts;
-    
-    // Filter based on user role
-    if (user?.role === 'seller') {
-      // Sellers see only their own products for management
-      filtered = mockProducts.filter(product => product.seller === user.name);
-    } else if (user?.role === 'farmer') {
-      // Farmers see all available products to buy
-      filtered = mockProducts;
-    } else if (user?.role === 'buyer') {
-      // Buyers shouldn't access product marketplace
-      filtered = [];
-    }
+  // Filter products based on search and category
+  const filteredProducts = React.useMemo(() => {
+    let filtered = products;
     
     // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(product =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.seller.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchTerm.toLowerCase())
+        product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.brand.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
@@ -57,8 +51,8 @@ const ProductMarketplace = () => {
       filtered = filtered.filter(product => product.category === categoryFilter);
     }
     
-    setFilteredProducts(filtered);
-  }, [searchTerm, categoryFilter, user]);
+    return filtered;
+  }, [products, searchTerm, categoryFilter]);
 
   const handleOrder = (product: Product) => {
     if (!user) {
@@ -87,75 +81,86 @@ const ProductMarketplace = () => {
     });
   };
 
-  const confirmOrder = () => {
+  const confirmOrder = async () => {
     if (!orderConfirmation.product || !user) return;
 
     const { product, quantity } = orderConfirmation;
 
-    // Create a new order (in real app, this would be an API call)
-    const newOrder = {
-      id: `ORD${Date.now()}`,
-      buyer: user.name,
-      buyerId: user.id,
-      seller: product.seller,
-      sellerId: 'seller-id', // In real app, this would come from product data
-      item: product.name,
-      itemId: product.id,
-      quantity: quantity,
-      price: product.price,
-      totalAmount: product.price * quantity,
-      status: 'pending' as const,
-      type: 'product' as const,
-      orderDate: new Date().toISOString().split('T')[0],
-      paymentMethod: 'cod' as const,
-      paymentStatus: 'pending' as const,
-      shippingAddress: {
-        address: '123 Default Address',
-        city: user.location.split(',')[0],
-        state: user.location.split(',')[1] || 'Unknown',
-        pincode: '000000'
-      }
-    };
+    try {
+      const orderData = {
+        buyer: user.name,
+        buyerId: user.id,
+        seller: product.seller,
+        sellerId: product.sellerId,
+        item: product.name,
+        itemId: product.id,
+        quantity: quantity,
+        price: product.price,
+        totalAmount: product.price * quantity,
+        status: 'pending' as const,
+        type: 'product' as const,
+        paymentMethod: 'cod' as const,
+        paymentStatus: 'pending' as const,
+        shippingAddress: {
+          address: '123 Default Address',
+          city: user.location.split(',')[0],
+          state: user.location.split(',')[1] || 'Unknown',
+          pincode: '000000'
+        }
+      };
 
-    // Add to mock orders (in real app, this would be saved to backend)
-    mockOrders.push(newOrder);
+      await createOrder(orderData);
 
-    setOrderConfirmation({ isOpen: false, product: null, quantity: 0 });
+      setOrderConfirmation({ isOpen: false, product: null, quantity: 0 });
 
-    toast({
-      title: "Order Placed!",
-      description: `Your order for ${product.name} (${quantity} units) has been sent to ${product.seller}. Total: ₹${newOrder.totalAmount.toLocaleString()}`,
-    });
+      toast({
+        title: "Order Placed!",
+        description: `Your order for ${product.name} (${quantity} units) has been sent to ${product.seller}. Total: ₹${orderData.totalAmount.toLocaleString()}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to place order. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleAddProduct = () => {
     setShowAddForm(true);
   };
 
-  const handleProductAdded = (newProduct: Product) => {
-    setShowAddForm(false);
-    // The product is already added to mockProducts in the form component
-    // Trigger a re-filter to show the new product
-    setFilteredProducts([...mockProducts]);
+  const handleProductAdded = async (newProductData: Product) => {
+    try {
+      await addProduct(newProductData);
+      setShowAddForm(false);
+    } catch (error) {
+      // Error is handled in the hook
+    }
   };
 
-  const handleEditProduct = (productName: string) => {
-    toast({
-      title: "Edit Product",
-      description: `Edit feature for ${productName} will be implemented soon.`,
-    });
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
   };
 
-  const handleDeleteProduct = (productId: string, productName: string) => {
-    // Remove from mock data (in real app, this would be an API call)
-    const index = mockProducts.findIndex(product => product.id === productId);
-    if (index > -1) {
-      mockProducts.splice(index, 1);
-      setFilteredProducts([...mockProducts]);
+  const handleProductUpdated = async (updatedProduct: Product) => {
+    try {
+      await updateProduct(updatedProduct.id, updatedProduct);
+      setEditingProduct(null);
+    } catch (error) {
+      // Error is handled in the hook
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    try {
+      await deleteProduct(productId);
       toast({
         title: "Product Removed",
         description: `${productName} has been removed from your listings.`,
       });
+    } catch (error) {
+      // Error is handled in the hook
     }
   };
 
@@ -180,9 +185,26 @@ const ProductMarketplace = () => {
       case 'seeds': return 'bg-green-100 text-green-800';
       case 'fertilizers': return 'bg-blue-100 text-blue-800';
       case 'pesticides': return 'bg-orange-100 text-orange-800';
+      case 'tools': return 'bg-purple-100 text-purple-800';
+      case 'equipment': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-earth flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-lg">Loading products...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-earth">
@@ -211,7 +233,7 @@ const ProductMarketplace = () => {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
-                placeholder="Search products or sellers..."
+                placeholder="Search products, sellers, or brands..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -226,16 +248,24 @@ const ProductMarketplace = () => {
                 <SelectItem value="seeds">Seeds</SelectItem>
                 <SelectItem value="fertilizers">Fertilizers</SelectItem>
                 <SelectItem value="pesticides">Pesticides</SelectItem>
+                <SelectItem value="tools">Tools</SelectItem>
+                <SelectItem value="equipment">Equipment</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        {/* Products Grid or Add Form */}
+        {/* Products Grid or Forms */}
         {showAddForm ? (
           <AddProductForm 
             onProductAdded={handleProductAdded}
             onCancel={() => setShowAddForm(false)}
+          />
+        ) : editingProduct ? (
+          <EditProductForm
+            product={editingProduct}
+            onProductUpdated={handleProductUpdated}
+            onCancel={() => setEditingProduct(null)}
           />
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -246,10 +276,14 @@ const ProductMarketplace = () => {
                 </div>
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-2xl">{product.name}</CardTitle>
+                    <CardTitle className="text-xl">{product.name}</CardTitle>
                     <Badge className={getCategoryColor(product.category)}>
                       {product.category}
                     </Badge>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Store className="w-4 h-4" />
+                    <span className="font-medium">{product.brand}</span>
                   </div>
                   <CardDescription className="text-base">
                     {product.description}
@@ -277,14 +311,33 @@ const ProductMarketplace = () => {
                       <Package className="w-4 h-4 mr-2" />
                       {product.stock} units in stock
                     </div>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Weight className="w-4 h-4 mr-2" />
+                      {product.weight} {product.unit} per unit
+                    </div>
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Mfg: {formatDate(product.manufacturingDate)}
+                    </div>
+                    {product.expiryDate && (
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Exp: {formatDate(product.expiryDate)}
+                      </div>
+                    )}
                     <div className="flex items-center text-sm text-accent">
                       <Truck className="w-4 h-4 mr-2" />
                       Free delivery available
                     </div>
+                    {product.isOrganic && (
+                      <Badge variant="secondary" className="bg-green-50 text-green-700">
+                        Organic
+                      </Badge>
+                    )}
                     <div className="flex items-center justify-between pt-4">
                       <div className="flex items-center text-2xl font-bold text-primary">
                         <IndianRupee className="w-6 h-6" />
-                        {product.price}
+                        {product.price.toLocaleString()}
                       </div>
                       {user?.role === 'farmer' ? (
                         <div className="flex flex-col gap-2 ml-4">
@@ -293,12 +346,12 @@ const ProductMarketplace = () => {
                             <Input
                               id={`quantity-${product.id}`}
                               type="number"
-                              min={1}
+                              min={product.minOrderQuantity}
                               max={product.stock}
-                              value={orderQuantities[product.id] || 1}
+                              value={orderQuantities[product.id] || product.minOrderQuantity}
                               onChange={(e) => setOrderQuantities({
                                 ...orderQuantities,
-                                [product.id]: parseInt(e.target.value) || 1
+                                [product.id]: parseInt(e.target.value) || product.minOrderQuantity
                               })}
                               className="w-20 h-8"
                             />
@@ -311,12 +364,12 @@ const ProductMarketplace = () => {
                             {product.stock === 0 ? 'Out of Stock' : 'Order Now'}
                           </Button>
                         </div>
-                      ) : user?.role === 'seller' && user.name === product.seller ? (
+                      ) : user?.role === 'seller' && user.id === product.sellerId ? (
                         <div className="flex gap-2 ml-4">
                           <Button 
                             variant="outline"
                             size="sm"
-                            onClick={() => handleEditProduct(product.name)}
+                            onClick={() => handleEditProduct(product)}
                           >
                             <Edit className="w-4 h-4 mr-1" />
                             Edit
@@ -340,7 +393,7 @@ const ProductMarketplace = () => {
           </div>
         )}
 
-        {filteredProducts.length === 0 && (
+        {filteredProducts.length === 0 && !showAddForm && !editingProduct && (
           <div className="text-center py-12">
             <p className="text-xl text-muted-foreground">
               {user?.role === 'seller' 

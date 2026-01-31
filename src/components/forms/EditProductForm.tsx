@@ -6,44 +6,45 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Product } from '@/types';
 import { ImagePlus, X, Plus } from 'lucide-react';
 
-interface AddProductFormProps {
-  onProductAdded: (product: Product) => void;
+interface EditProductFormProps {
+  product: Product;
+  onProductUpdated: (product: Product) => void;
   onCancel: () => void;
 }
 
-const AddProductForm: React.FC<AddProductFormProps> = ({ onProductAdded, onCancel }) => {
-  const { user } = useAuth();
+const EditProductForm: React.FC<EditProductFormProps> = ({ product, onProductUpdated, onCancel }) => {
   const { toast } = useToast();
   const [formData, setFormData] = useState({
-    name: '',
-    category: '',
-    price: '',
-    stock: '',
-    description: '',
-    brand: '',
-    manufacturingDate: '',
-    expiryDate: '',
-    weight: '',
-    unit: 'kg' as 'kg' | 'gm' | 'liter' | 'piece',
-    minOrderQuantity: '1',
-    isOrganic: false,
-    featured: false
+    name: product.name,
+    category: product.category,
+    price: product.price.toString(),
+    stock: product.stock.toString(),
+    description: product.description,
+    brand: product.brand,
+    manufacturingDate: product.manufacturingDate,
+    expiryDate: product.expiryDate || '',
+    weight: product.weight.toString(),
+    unit: product.unit,
+    minOrderQuantity: product.minOrderQuantity.toString(),
+    isOrganic: product.isOrganic,
+    featured: product.featured
   });
-  const [imageUrls, setImageUrls] = useState<string[]>(['']);
-  const [specifications, setSpecifications] = useState<Array<{key: string, value: string}>>([
-    { key: '', value: '' }
-  ]);
-  const [certifications, setCertifications] = useState<string[]>(['']);
+  const [imageUrls, setImageUrls] = useState<string[]>(product.images.length > 0 ? product.images : ['']);
+  const [specifications, setSpecifications] = useState<Array<{key: string, value: string}>>(
+    product.specifications 
+      ? Object.entries(product.specifications).map(([key, value]) => ({ key, value }))
+      : [{ key: '', value: '' }]
+  );
+  const [certifications, setCertifications] = useState<string[]>(
+    product.certifications.length > 0 ? product.certifications : ['']
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!user) return;
 
     // Validate form
     if (!formData.name || !formData.category || !formData.price || !formData.stock || 
@@ -80,10 +81,9 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onProductAdded, onCance
     const validCertifications = certifications.filter(cert => cert.trim() !== '');
 
     try {
-      const newProduct: Omit<Product, 'id' | 'reviews' | 'averageRating'> = {
+      const updatedProduct: Product = {
+        ...product,
         name: formData.name,
-        seller: user.name,
-        sellerId: user.id,
         category: formData.category as 'seeds' | 'fertilizers' | 'pesticides' | 'tools' | 'equipment',
         price: parseFloat(formData.price),
         stock: parseInt(formData.stock),
@@ -101,16 +101,16 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onProductAdded, onCance
         featured: formData.featured
       };
 
-      await onProductAdded(newProduct as Product);
+      await onProductUpdated(updatedProduct);
 
       toast({
-        title: "Product Listed!",
-        description: `Your ${formData.name} has been successfully listed in the marketplace.`
+        title: "Product Updated!",
+        description: `Your ${formData.name} has been successfully updated.`
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to list product. Please try again.",
+        description: "Failed to update product. Please try again.",
         variant: "destructive"
       });
     }
@@ -122,10 +122,8 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onProductAdded, onCance
 
   const updateImageUrl = (index: number, url: string) => {
     const updated = [...imageUrls];
-    // Process image URL to ensure it's treated as jpg/jpeg
     let processedUrl = url.trim();
     if (processedUrl && !processedUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-      // If no extension, assume it's a jpg
       processedUrl = processedUrl + '.jpg';
     }
     updated[index] = processedUrl;
@@ -173,9 +171,9 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onProductAdded, onCance
   return (
     <Card className="max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>List Your Product</CardTitle>
+        <CardTitle>Edit Product</CardTitle>
         <CardDescription>
-          Add your farming product to the marketplace
+          Update your product information
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -437,7 +435,7 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onProductAdded, onCance
 
           <div className="flex gap-3 pt-4">
             <Button type="submit" className="flex-1">
-              List Product
+              Update Product
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
@@ -449,4 +447,4 @@ const AddProductForm: React.FC<AddProductFormProps> = ({ onProductAdded, onCance
   );
 };
 
-export default AddProductForm;
+export default EditProductForm;
