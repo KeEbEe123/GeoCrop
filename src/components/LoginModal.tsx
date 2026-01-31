@@ -101,7 +101,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess, onS
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Sign In</DialogTitle>
           <DialogDescription>
@@ -141,6 +141,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess, onS
                 placeholder="Enter your password"
                 disabled={loading}
                 required
+                className="pr-10"
               />
               <Button
                 type="button"
@@ -155,18 +156,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess, onS
             </div>
           </div>
 
-          <DialogFooter className="flex flex-col gap-3 pt-4">
-            <div className="flex gap-2 w-full">
-              <Button type="button" variant="outline" onClick={handleClose} disabled={loading} className="flex-1">
+          <DialogFooter className="flex flex-col gap-3 pt-4 sm:flex-row">
+            <div className="flex flex-col sm:flex-row gap-2 w-full">
+              <Button type="button" variant="outline" onClick={handleClose} disabled={loading} className="flex-1 order-2 sm:order-1">
                 Cancel
               </Button>
-              <Button type="submit" disabled={loading} className="flex-1">
+              <Button type="submit" disabled={loading} className="flex-1 order-1 sm:order-2">
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Sign In
               </Button>
             </div>
             
-            <div className="text-center">
+            <div className="text-center w-full">
               <p className="text-sm text-muted-foreground">
                 Don't have an account?{' '}
                 <Button
@@ -187,9 +188,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess, onS
         <div className="mt-4 p-3 bg-muted rounded-lg">
           <p className="text-xs font-semibold text-muted-foreground mb-2">Demo Credentials:</p>
           <div className="text-xs text-muted-foreground space-y-1">
-            <p><strong>Farmer:</strong> rajesh.farmer@example.com / password123</p>
-            <p><strong>Buyer:</strong> priya.buyer@example.com / password123</p>
-            <p><strong>Seller:</strong> amit.seller@example.com / password123</p>
+            <div className="flex flex-col sm:flex-row sm:justify-between">
+              <span><strong>Farmer:</strong> rajesh.farmer@example.com</span>
+              <span className="sm:ml-2">password123</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:justify-between">
+              <span><strong>Buyer:</strong> priya.buyer@example.com</span>
+              <span className="sm:ml-2">password123</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:justify-between">
+              <span><strong>Seller:</strong> amit.seller@example.com</span>
+              <span className="sm:ml-2">password123</span>
+            </div>
           </div>
         </div>
       </DialogContent>
